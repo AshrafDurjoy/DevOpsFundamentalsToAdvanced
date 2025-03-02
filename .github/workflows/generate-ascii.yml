@@ -5,10 +5,11 @@ jobs:
   generate_ascii_artwork:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Readme file
         run: cat README.md
-      # - name: Checkout code
-      #   uses: actions/checkout@v4
 
       # - name: Install cowsay
       #   run: sudo apt-get update && sudo apt-get install -y cowsay
