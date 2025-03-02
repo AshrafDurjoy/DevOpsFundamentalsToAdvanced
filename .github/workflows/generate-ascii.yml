@@ -5,7 +5,7 @@ jobs:
   generate_ascii_artwork:
     runs-on: ubuntu-latest
     steps:
-      -name: Readme file
+      - name: Readme file
         run: cat README.md
       # - name: Checkout code
       #   uses: actions/checkout@v4
