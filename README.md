@@ -119,7 +119,7 @@
 3. **Stage and Commit the New File:**
    ```bash
    git add login.html
-   git commit -m "Add basic login page"zoom
+   git commit -m "Add basic login page"
    ```
    **Expected Outcome:**  
    A commit is made including `login.html`.
