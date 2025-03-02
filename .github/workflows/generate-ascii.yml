@@ -5,22 +5,24 @@ jobs:
   generate_ascii_artwork:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      -name: Readme file
+        run: cat README.md
+      # - name: Checkout code
+      #   uses: actions/checkout@v4
 
-      - name: Install cowsay
-        run: sudo apt-get update && sudo apt-get install -y cowsay
+      # - name: Install cowsay
+      #   run: sudo apt-get update && sudo apt-get install -y cowsay
 
-      - name: Generate ASCII Artwork
-        run: cowsay -f dragon "Run for cover, I'm a dragon!" >> dragon.txt
+      # - name: Generate ASCII Artwork
+      #   run: cowsay -f dragon "Run for cover, I'm a dragon!" >> dragon.txt
 
-      - name: Test file exist
-        run: grep -i "dragon" dragon.txt
+      # - name: Test file exist
+      #   run: grep -i "dragon" dragon.txt
 
-      - name: Read File
-        run: cat dragon.txt
+      # - name: Read File
+      #   run: cat dragon.txt
     
-      - name: List files
-        run: ls -al
+      # - name: List files
+      #   run: ls -al
 
       
