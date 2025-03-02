@@ -10,3 +10,15 @@ jobs:
       - name: Hello Step
 
         run: echo "Hello GitHub Actions!"
+
+      - name: Welcome message
+
+        run: echo "My first github actions job"
+
+      - name: List files
+
+        run: ls -al
+
+      - name: Read file
+
+        run: cat README.md
