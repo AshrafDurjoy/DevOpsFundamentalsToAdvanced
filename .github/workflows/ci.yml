@@ -1,48 +1,48 @@
 
-# name: CI pipeline
-# on: [push, pull_request]
+name: CI pipeline
+on: [push, pull_request]
 
-# jobs:
-#   build:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v3
-#       - name: Setup Node.js
-#         uses: actions/setup-node@v3
-#         with:
-#           node-version: '16'
-#       - name: Install dependencies
-#         run: npm ci
-#       - name: Build
-#         run: npm run build
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
 
-#   test:
-#     needs: build
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v3
-#       - name: Setup Node.js
-#         uses: actions/setup-node@v3
-#         with:
-#           node-version: '16'
-#       - name: Install dependencies
-#         run: npm ci
-#       - name: Run unit tests
-#         run: npm run test:unit
-#       - name: Run integration tests
-#         run: npm run test:integration
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run unit tests
+        run: npm run test:unit
+      - name: Run integration tests
+        run: npm run test:integration
 
-#   quality:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v3
-#       - name: Setup Node.js
-#         uses: actions/setup-node@v3
-#         with:
-#           node-version: '16'
-#       - name: Install dependencies
-#         run: npm ci
-#       - name: Lint code
-#         run: npm run lint
-#       - name: Check formatting
-#         run: npm run format:check
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint code
+        run: npm run lint
+      - name: Check formatting
+        run: npm run format:check
