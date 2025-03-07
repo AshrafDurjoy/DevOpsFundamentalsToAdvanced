@@ -1,5 +1,4 @@
 name: Multiple Jobs
-
 on: [push]
 
 jobs:
