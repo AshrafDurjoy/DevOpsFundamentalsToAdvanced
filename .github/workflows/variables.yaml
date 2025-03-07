@@ -3,7 +3,6 @@ name: Variables Scopes Demo
 env:
   WORKFLOW_VAR: "This is set at workflow level"
   SHARED_VAR: "This comes from workflow"
-
 on: [push]
 
 jobs:
