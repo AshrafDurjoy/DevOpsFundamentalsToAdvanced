@@ -281,6 +281,57 @@ steps:
 - **Create Your Own Reusable Actions**: You can create custom actions to automate specific tasks.
 - **Example**: A custom action for website deployment.
 
+#### Example: Creating a Custom JavaScript Action
+
+1. Create an action.yml file:
+```yaml
+name: 'Hello World'
+description: 'Greet someone and record the time'
+inputs:
+  who-to-greet:
+    description: 'Who to greet'
+    required: true
+    default: 'World'
+outputs:
+  time:
+    description: 'The time we greeted you'
+runs:
+  using: 'node16'
+  main: 'index.js'
+```
+
+2. Create an index.js file:
+```javascript
+const core = require('@actions/core');
+const github = require('@actions/github');
+
+try {
+  // Get inputs
+  const nameToGreet = core.getInput('who-to-greet');
+  console.log(`Hello ${nameToGreet}!`);
+  
+  // Get time
+  const time = (new Date()).toTimeString();
+  core.setOutput("time", time);
+} catch (error) {
+  core.setFailed(error.message);
+}
+```
+
+3. Use the custom action in a workflow:
+```yaml
+jobs:
+  hello_world_job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - id: hello
+        uses: ./.github/actions/hello-world
+        with:
+          who-to-greet: 'DevOps Engineer'
+      - run: echo "The time was ${{ steps.hello.outputs.time }}"
+```
+
 ## 7. Secrets & Environment Variables
 
 ### Secrets
@@ -357,8 +408,50 @@ steps:
 ### Upload
 - **Store Build Outputs as Artifacts**: Store build outputs (like compiled code or test results) as artifacts.
 
+#### Example: Uploading Build Artifacts
+```yaml
+steps:
+  - name: Build application
+    run: npm run build
+  
+  - name: Upload build artifacts
+    uses: actions/upload-artifact@v2
+    with:
+      name: build-files
+      path: build/
+      retention-days: 5
+```
+
 ### Download
 - **Retrieve Artifacts Between Jobs**: Download artifacts in a subsequent job for further processing.
+
+#### Example: Downloading Artifacts in Another Job
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build project
+        run: npm run build
+      - name: Upload build files
+        uses: actions/upload-artifact@v2
+        with:
+          name: build-files
+          path: build/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build files
+        uses: actions/download-artifact@v2
+        with:
+          name: build-files
+          path: build-output
+      - name: Deploy to server
+        run: ./deploy-script.sh build-output/
+```
 
 ### Cache
 - **Speed Up Workflows with Dependency Caching**: Cache dependencies (e.g., npm modules, Python packages) to speed up workflows.
@@ -399,14 +492,106 @@ steps:
 ### Matrix Builds
 - **Test Across Multiple Versions**: Run jobs on multiple configurations (e.g., different versions of Node.js or Python).
 
+#### Example: Matrix Build for Multiple Node.js Versions
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [12.x, 14.x, 16.x, 18.x]
+        
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci
+      - run: npm test
+```
+
 ### Optimization
 - **Workflow Optimization & Parallelization**: Optimize workflows by running jobs in parallel and minimizing execution time.
+
+#### Example: Parallel Job Execution with Different Operating Systems
+```yaml
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run platform-specific tests
+        run: ./run-tests-${{ matrix.os }}.sh
+```
 
 ### Reusable Workflows
 - **Create Composite Actions**: Create reusable workflows and actions for better modularization.
 
+#### Example: Creating a Reusable Workflow
+```yaml
+# .github/workflows/reusable.yml
+name: Reusable workflow
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+    secrets:
+      deploy-token:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Deploy to environment
+        run: |
+          echo "Deploying to ${{ inputs.environment }}"
+          ./deploy.sh --token "${{ secrets.deploy-token }}"
+```
+
+#### Example: Calling a Reusable Workflow
+```yaml
+# .github/workflows/caller.yml
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  call-deploy-workflow:
+    uses: ./.github/workflows/reusable.yml
+    with:
+      environment: 'production'
+    secrets:
+      deploy-token: ${{ secrets.PROD_DEPLOY_TOKEN }}
+```
+
 ### Self-Hosted Runners
 - **Custom Environments for Special Needs**: Set up custom runners on your own hardware for specific requirements.
+
+#### Example: Using a Self-Hosted Runner
+```yaml
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build on custom hardware
+        run: ./build-specialized.sh
+      - name: Deploy internally
+        run: ./deploy-to-internal-server.sh
+```
 
 ## 13. Summary & Key Takeaways
 
@@ -418,6 +603,3 @@ steps:
 ## 14. Q&A Section
 
 - This section can be used for frequently asked questions or interactive sessions during training.
-
-
-
