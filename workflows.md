@@ -188,3 +188,209 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "Issue created or edited!"
+
+# GitHub Actions: Jobs & Steps
+
+## 1. Multiple Jobs
+### Run Parallel or Sequential Jobs
+- **Parallel Jobs:** Run multiple jobs at the same time.
+- **Sequential Jobs:** Run jobs one after another.
+- **Example:** A workflow where the `test` job runs after the `build` job.
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Building the app..."
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Running tests..."
+
+2. Steps in Job
+Execute Shell Commands or Custom Actions
+
+    Shell Commands: Each step in a job can run shell commands.
+    Custom Actions: Use GitHub’s built-in actions or create your own custom actions.
+    Example: Running a shell command to install dependencies.
+
+steps:
+  - name: Checkout code
+    uses: actions/checkout@v2
+  - name: Install dependencies
+    run: npm install
+
+3. Dependencies
+Use needs: to Specify Job Dependencies
+
+    Job Dependencies: Control the order of execution by specifying dependencies between jobs.
+    Example: The test job depends on the completion of the build job.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Building the app..."
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Running tests..."
+
+4. Using Built-in & Custom Actions
+Built-in Actions
+
+    actions/checkout: Clones the repository.
+    actions/setup-node: Sets up Node.js.
+    Example:
+
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v2
+  - name: Set up Node.js
+    uses: actions/setup-node@v2
+    with:
+      node-version: '16'
+
+Custom Actions
+
+    Create Your Own Reusable Actions: You can create custom actions to automate specific tasks.
+    Example: A custom action for website deployment.
+
+5. Secrets & Environment Variables
+Secrets
+
+    Store API Keys Securely: Use GitHub secrets to store sensitive data like API keys.
+    Access Secrets: Access secrets using ${{ secrets.SECRET_NAME }}.
+    Example: Use secrets.GITHUB_TOKEN for authentication.
+
+steps:
+  - name: Checkout code
+    uses: actions/checkout@v2
+  - name: Deploy
+    run: curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" https://example.com/deploy
+
+Environment Variables
+
+    Global & Job-Specific Variables: Define environment variables at the global level or within individual jobs.
+    Access Variables: Use ${{ env.VARIABLE_NAME }} in your workflow.
+
+env:
+  NODE_ENV: production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ env.NODE_ENV }}
+
+6. Code Build & Testing Automation
+Run Tests
+
+    Automated Test Execution: Run tests automatically as part of the CI/CD pipeline.
+    Example: Trigger tests as part of the workflow.
+
+steps:
+  - name: Run tests
+    run: npm test
+
+Testing Tools
+
+    Integration with Testing Frameworks: Use Jest, Pytest, JUnit, Mocha, etc., for automated tests.
+    Example:
+
+steps:
+  - name: Run tests with Jest
+    run: npm run test
+
+Reports
+
+    Code Coverage & Linting Reports: Use actions to generate reports on code coverage and linting.
+
+7. Deploying with GitHub Actions
+Deployment Methods
+
+    FTP/SSH, Cloud Providers, Docker/Kubernetes: Deploy your application via multiple methods like FTP, cloud providers, or containers.
+
+Configuration
+
+    Set Up Deployment Steps in Workflow: Configure deployment actions directly in your GitHub Actions workflow.
+
+Example: Firebase Deployment with Authentication Tokens
+
+steps:
+  - name: Deploy to Firebase
+    run: firebase deploy --token ${{ secrets.FIREBASE_TOKEN }}
+
+8. Managing Artifacts & Caching
+Upload
+
+    Store Build Outputs as Artifacts: Store build outputs (like compiled code or test results) as artifacts.
+
+Download
+
+    Retrieve Artifacts Between Jobs: Download artifacts in a subsequent job for further processing.
+
+Cache
+
+    Speed Up Workflows with Dependency Caching: Cache dependencies (e.g., npm modules, Python packages) to speed up workflows.
+
+steps:
+  - name: Cache npm dependencies
+    uses: actions/cache@v2
+    with:
+      path: ~/.npm
+      key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
+
+9. Debugging & Troubleshooting
+Check Logs
+
+    Review Execution Logs: Check logs in the GitHub Actions UI for detailed information on job execution.
+
+Debug Mode
+
+    Enable Debugging: Set ACTIONS_RUNNER_DEBUG: true to enable debug logging.
+
+env:
+  ACTIONS_RUNNER_DEBUG: true
+
+Echo Statements
+
+    Use Echo for Debugging Variables: Use echo statements to output variable values and states during execution.
+
+steps:
+  - name: Debug with echo
+    run: echo "Node version: ${{ env.NODE_ENV }}"
+
+10. Advanced Topics to Learn Next
+Matrix Builds
+
+    Test Across Multiple Versions: Run jobs on multiple configurations (e.g., different versions of Node.js or Python).
+
+Optimization
+
+    Workflow Optimization & Parallelization: Optimize workflows by running jobs in parallel and minimizing execution time.
+
+Reusable Workflows
+
+    Create Composite Actions: Create reusable workflows and actions for better modularization.
+
+Self-Hosted Runners
+
+    Custom Environments for Special Needs: Set up custom runners on your own hardware for specific requirements.
+
+11. Summary & Key Takeaways
+
+    Automate Workflows: GitHub Actions enables complete automation of your CI/CD pipeline.
+    Jobs & Steps: Use jobs, steps, and actions effectively to break down complex workflows.
+    Security: Secure sensitive data with secrets and environment variables.
+    Optimization: Debug efficiently and optimize workflows for performance.
+
+12. Q&A
+
+
+
+
