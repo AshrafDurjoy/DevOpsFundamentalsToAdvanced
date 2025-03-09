@@ -1,6 +1,12 @@
 name: 09b - Docker Build and Push Demo
 
-on: [workflow_dispatch]
+on: 
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/09b-docker-build-push.yml'
 
 env:
   REGISTRY: ghcr.io
@@ -13,10 +19,13 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write  # Required for security scanning
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper versioning
 
       - name: Create Dockerfile if not exists
         run: |
@@ -31,6 +40,11 @@ jobs:
             echo "Demo Dockerfile created"
           fi
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: 'arm64,amd64'
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -41,6 +55,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Add Dockerfile linting
+      - name: Lint Dockerfile
+        run: |
+          echo "Linting Dockerfile..."
+          if grep -q "FROM.*latest" Dockerfile; then
+            echo "::warning::Using 'latest' tag in FROM instruction is not recommended. Use specific version instead."
+          fi
+          echo "Basic Dockerfile linting completed"
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -48,18 +71,31 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha,format=short
+            type=ref,event=branch
+            type=semver,pattern={{version}}
             latest
 
-      - name: Build Docker image without pushing
+      - name: Build Docker image for multiple platforms
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false  # Don't actually push in demo mode
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           
+      # Add container security scanning
+      - name: Security scan for vulnerabilities
+        run: |
+          echo "Simulating container security scanning..."
+          echo "✅ No critical vulnerabilities found"
+          echo "⚠️ 2 medium vulnerabilities detected (demo)"
+          echo "For actual scanning, consider using:"
+          echo "  - Trivy: aquasecurity/trivy-action"
+          echo "  - Snyk: snyk/actions"
+
       - name: Simulate image push
         run: |
           echo "🚀 In a real workflow, the image would be pushed to: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
@@ -67,3 +103,6 @@ jobs:
           echo "${{ steps.meta.outputs.tags }}" | tr '\n' ' '
           echo ""
           echo "✅ Image build successful!"
+          echo "📊 Image details:"
+          echo "  - Architecture: linux/amd64, linux/arm64"
+          echo "  - Created: $(date -u)"

@@ -1,31 +1,76 @@
 name: 12a - Reusable Workflow Definition
 
+# Documentation section at the top
+# Purpose: This is a reusable workflow that can be called by other workflows.
+# It handles deployment to different environments with proper authentication.
+
 on:
   workflow_call:
     inputs:
       environment:
         required: true
         type: string
-        description: "Deployment environment"
+        description: "Deployment environment (development, staging, production)"
       version:
         required: false
         type: string
         default: "latest"
         description: "Version to deploy"
+      debug-mode:
+        required: false
+        type: boolean
+        default: false
+        description: "Enable extra debugging output"
     secrets:
       deploy-token:
         required: true
         description: "Deployment authentication token"
+    outputs:
+      deployment-url:
+        description: "URL of the deployed application"
+        value: ${{ jobs.reusable-deploy-job.outputs.deployment-url }}
 
 jobs:
   reusable-deploy-job:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.url }}
+      
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1  # Only need the latest commit
       
+      # Add input validation
+      - name: Validate inputs
+        run: |
+          # Validate environment
+          case "${{ inputs.environment }}" in
+            development|staging|production) echo "✅ Valid environment: ${{ inputs.environment }}" ;;
+            *) echo "::error::Invalid environment: ${{ inputs.environment }}. Must be one of: development, staging, production" && exit 1 ;;
+          esac
+          
+          # Validate version format if not "latest"
+          if [[ "${{ inputs.version }}" != "latest" ]]; then
+            if [[ ! "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::warning::Version format should be semantic (e.g., 1.2.3). Got: ${{ inputs.version }}"
+            fi
+          fi
+      
+      # Add conditional debug output
+      - name: Debug information
+        if: ${{ inputs.debug-mode }}
+        run: |
+          echo "🔍 DEBUG MODE ENABLED"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Version: ${{ inputs.version }}"
+          echo "Token exists: ${{ secrets.deploy-token != '' }}"
+          echo "Runner: ${{ runner.os }}"
+          
       - name: Deploy to environment
+        id: deploy
         run: |
           echo "🚀 Deploying version ${{ inputs.version }} to ${{ inputs.environment }}"
           echo "Using deployment token for authentication (value hidden)"
@@ -35,16 +80,47 @@ jobs:
           case "${{ inputs.environment }}" in
             "development")
               echo "🔧 Running development deployment script..."
+              echo "::set-output name=url::https://dev.example.com"
               ;;
             "staging")
               echo "🧪 Running staging deployment script with additional testing..."
+              echo "::set-output name=url::https://staging.example.com"
               ;;
             "production")
               echo "🚨 Running production deployment with final verification..."
+              echo "::set-output name=url::https://www.example.com"
               ;;
             *)
               echo "❓ Unknown environment: ${{ inputs.environment }}"
+              exit 1
               ;;
           esac
           
+      # Add error handling and retry logic
+      - name: Verify deployment
+        if: success()
+        run: |
           echo "✅ Deployment to ${{ inputs.environment }} completed successfully!"
+          echo "🔗 Deployed at: ${{ steps.deploy.outputs.url }}"
+          
+          # Simulate health check with retry logic
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          HEALTH_CHECK_PASSED=false
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$HEALTH_CHECK_PASSED" = false ]; do
+            echo "Performing health check (attempt $(($RETRY_COUNT + 1))/$MAX_RETRIES)..."
+            # Simulate health check that passes on the second attempt
+            if [ $RETRY_COUNT -ge 1 ]; then
+              HEALTH_CHECK_PASSED=true
+              echo "Health check passed!"
+            else
+              echo "Health check failed, retrying..."
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              sleep 1
+            fi
+          done
+          
+          if [ "$HEALTH_CHECK_PASSED" = false ]; then
+            echo "::warning::Health check failed after $MAX_RETRIES attempts but continuing"
+          fi

@@ -9,6 +9,7 @@ on:
         description: 'Message to display'
         default: 'Hello from manual trigger!'
         required: true
+        type: string  # Explicitly specify the type
   
   # Push event trigger with path and branch filtering
   push:
@@ -16,15 +17,22 @@ on:
     paths:
       - '**.md'
       - '**.html'
+    # Add path-ignore to demonstrate exclusion pattern
+    paths-ignore:
+      - 'docs/README.md'
   
   # Pull request event trigger
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]  # Added reopened event
     branches: [ main ]
   
   # Schedule trigger (commented to avoid unnecessary runs)
   # schedule:
   #   - cron: '0 12 * * 1-5'  # Monday to Friday at 12:00 UTC
+  
+  # Add repository_dispatch example (commented)
+  # repository_dispatch:
+  #   types: [deploy-event, test-event]
 
 jobs:
   show-trigger-info:
@@ -33,12 +41,22 @@ jobs:
       - name: Show trigger details
         run: |
           echo "Workflow triggered by: ${{ github.event_name }}"
+          echo "Runner OS: ${{ runner.os }}"
+          
+          # Enhanced event-specific information
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "Manual message: ${{ github.event.inputs.message }}"
           elif [ "${{ github.event_name }}" == "push" ]; then
             echo "Branch: ${{ github.ref_name }}"
             echo "Commit message: ${{ github.event.head_commit.message }}"
+            echo "Commit author: ${{ github.event.head_commit.author.name }}"
+            echo "Modified files: ${{ join(github.event.commits.*.modified, ', ') }}"
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "PR title: ${{ github.event.pull_request.title }}"
+            echo "PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
             echo "PR action: ${{ github.event.action }}"
+            echo "PR author: ${{ github.event.pull_request.user.login }}"
+            echo "PR branch: ${{ github.event.pull_request.head.ref }}"
+          # elif [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+          #   echo "Custom event type: ${{ github.event.client_payload.type }}"
+          #   echo "Custom payload: ${{ toJSON(github.event.client_payload) }}"
           fi
