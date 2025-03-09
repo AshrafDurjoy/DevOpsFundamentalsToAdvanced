@@ -1,0 +1,5 @@
+name: 10a - Artifacts Demo
+
+on: [push, workflow_dispatch]
+
+# ...existing code...

@@ -11,6 +11,7 @@ This directory contains workflow examples organized by lesson topic:
 
 ## 3. Setting Up GitHub Actions
 - [03-first-workflow.yaml](./03-first-workflow.yaml) - Setting up a simple GitHub Actions workflow
+- [03b-workflow-dispatch.yaml](./03b-workflow-dispatch.yaml) - Basic manual workflow dispatch example
 
 ## 4. Workflow Triggers
 - [04-workflow-triggers.yml](./04-workflow-triggers.yml) - Examples of various workflow triggers
@@ -37,8 +38,8 @@ This directory contains workflow examples organized by lesson topic:
 - [09c-multi-environment-deploy.yml](./09c-multi-environment-deploy.yml) - Multi-environment deployment
 
 ## 10. Managing Artifacts & Caching
-- [10a-artifact.yml](./10a-artifact.yml) - Working with artifacts
 - [10-artifacts-and-cache.yml](./10-artifacts-and-cache.yml) - Artifact and cache demonstrations
+- [10a-artifact.yml](./10a-artifact.yml) - Working with artifacts
 
 ## 11. Debugging & Troubleshooting
 - [11-debugging-demo.yml](./11-debugging-demo.yml) - Debugging techniques 
