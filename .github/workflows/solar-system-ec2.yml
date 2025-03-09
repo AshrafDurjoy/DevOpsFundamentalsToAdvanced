@@ -69,6 +69,59 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit
       
+      - name: Create DynamoDB mock for testing
+        run: |
+          # Create a dynamodb-mock.js file to be used during testing
+          cat > dynamodb-mock.js << 'EOF'
+          const AWS = require('aws-sdk');
+          
+          // Create mock implementation for DynamoDB
+          const mockDynamoDB = {
+            scan: (params, callback) => {
+              console.log('Mock DynamoDB scan called with:', JSON.stringify(params));
+              const mockItems = [
+                { id: { N: '1' }, name: { S: 'Mercury' }, description: { S: 'Mock planet description' }, 
+                  image: { S: 'mock-image-url' }, velocity: { S: '47.87 km/s' }, distance: { S: '57.91 million km' } },
+                { id: { N: '2' }, name: { S: 'Venus' }, description: { S: 'Mock planet description' },
+                  image: { S: 'mock-image-url' }, velocity: { S: '35.02 km/s' }, distance: { S: '108.2 million km' } }
+              ];
+              return callback ? callback(null, { Items: mockItems }) : { promise: () => Promise.resolve({ Items: mockItems }) };
+            },
+            getItem: (params, callback) => {
+              console.log('Mock DynamoDB getItem called with:', JSON.stringify(params));
+              const id = params.Key.id.N;
+              const mockItem = {
+                id: { N: id },
+                name: { S: `Planet-${id}` },
+                description: { S: 'Mock planet description' },
+                image: { S: 'mock-image-url' },
+                velocity: { S: '30 km/s' },
+                distance: { S: '100 million km' }
+              };
+              return callback ? callback(null, { Item: mockItem }) : { promise: () => Promise.resolve({ Item: mockItem }) };
+            }
+          };
+          
+          // Override AWS.DynamoDB.DocumentClient with our mock
+          const originalDocumentClient = AWS.DynamoDB.DocumentClient;
+          AWS.DynamoDB.DocumentClient = function() {
+            return mockDynamoDB;
+          };
+          
+          // Also override the regular DynamoDB client
+          const originalDynamoDB = AWS.DynamoDB;
+          AWS.DynamoDB = function() {
+            return mockDynamoDB;
+          };
+          
+          console.log('DynamoDB mock configured for testing');
+          module.exports = mockDynamoDB;
+          EOF
+          
+          # Make the mock available to the test environment
+          echo "console.log('Loading DynamoDB mock');" >> test-setup.js
+          echo "require('./dynamodb-mock');" >> test-setup.js
+      
       - name: Configure environment for tests
         run: |
           # Set up testing environment variables
@@ -82,6 +135,16 @@ jobs:
           echo "aws_access_key_id=mock-key" >> ~/.aws/credentials
           echo "aws_secret_access_key=mock-secret" >> ~/.aws/credentials
           echo "aws_region=us-east-1" >> ~/.aws/credentials
+      
+      - name: Update test command to use mock
+        run: |
+          # Update the test command with the require flag to use our mock setup
+          if grep -q "\"test\":" package.json; then
+            sed -i 's/"test":.*mocha/"test": "NODE_ENV=test mocha --require .\/test-setup.js/' package.json
+            cat package.json
+          else
+            echo "Warning: Could not update test command in package.json, scripts.test not found"
+          fi
       
       - name: Run tests
         run: npm test
