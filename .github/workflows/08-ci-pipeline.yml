@@ -1,0 +1,4 @@
+name: 08 - CI Pipeline Demo
+on: [push, pull_request, workflow_dispatch]
+
+# ...existing code...

@@ -1,0 +1,7 @@
+name: 07a - Variables Scopes Demo
+# Workflow level variables
+env:
+  WORKFLOW_VAR: "This is set at workflow level"
+  SHARED_VAR: "This comes from workflow"
+
+# ...existing code...

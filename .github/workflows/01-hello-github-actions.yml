@@ -1,0 +1,25 @@
+name: 01 - Hello GitHub Actions
+
+on:
+  workflow_dispatch:  # Manual trigger via GitHub UI
+  push:
+    branches: [ main ]
+
+jobs:
+  hello-world:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Say Hello
+        run: echo "Hello, GitHub Actions!"
+        # Add an ID to reference this step's output later
+        id: hello-step
+      
+      - name: Show execution time
+        run: |
+          # Use multi-line script to demonstrate more complex commands
+          echo "Current time is $(date)"
+          echo "Workflow run URL: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          
+      # Add a step to demonstrate step output capturing
+      - name: Use output from previous step
+        run: echo "Previous step executed at ${{ steps.hello-step.outputs.time }}"

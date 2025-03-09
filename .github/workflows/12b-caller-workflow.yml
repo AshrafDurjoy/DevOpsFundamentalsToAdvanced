@@ -1,0 +1,68 @@
+name: 12b - Caller Workflow Example
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      version:
+        description: 'Version to deploy'
+        required: false
+        default: 'latest'
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare for deployment
+        run: |
+          echo "Preparing to deploy version ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}"
+          echo "Validation passed! Ready to deploy."
+  
+  # For demo purposes, we'll simulate calling the reusable workflow instead of actually doing it
+  simulate-reusable-workflow:
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Explain reusable workflow concept
+        run: |
+          echo "📚 Normally, this job would call a reusable workflow using:"
+          echo "uses: ./.github/workflows/12a-reusable-workflow.yml"
+          echo "with:"
+          echo "  environment: ${{ github.event.inputs.environment }}"
+          echo "  version: ${{ github.event.inputs.version }}"
+          echo "secrets:"
+          echo "  deploy-token: \${{ secrets.DEPLOY_TOKEN }}"
+          
+      - name: Simulate reusable workflow execution
+        run: |
+          echo "🚀 Deploying version ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}"
+          echo "Using deployment token for authentication (value hidden)"
+          
+          case "${{ github.event.inputs.environment }}" in
+            "development")
+              echo "🔧 Running development deployment script..."
+              ;;
+            "staging")
+              echo "🧪 Running staging deployment script with additional testing..."
+              ;;
+            "production")
+              echo "🚨 Running production deployment with final verification..."
+              ;;
+            *)
+              echo "❓ Unknown environment: ${{ github.event.inputs.environment }}"
+              ;;
+          esac
+          
+          echo "✅ Deployment to ${{ github.event.inputs.environment }} completed successfully!"

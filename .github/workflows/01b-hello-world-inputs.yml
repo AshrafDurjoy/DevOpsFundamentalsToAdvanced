@@ -1,0 +1,26 @@
+name: 01b - Hello World with Inputs
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Name of the person to greet'
+        required: true
+        default: 'Student'
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send greeting
+        run: echo "Hello ${{ github.event.inputs.name || 'GitHub Actions' }}!"
+      
+      - name: Show date
+        run: |
+          echo "Current date is $(date)"
+          echo "This job runs on ${{ runner.os }}"
+      
+      - name: List GitHub context
+        run: echo "${{ toJson(github) }}" | jq .

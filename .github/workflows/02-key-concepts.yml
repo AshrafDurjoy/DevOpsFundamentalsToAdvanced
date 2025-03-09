@@ -1,0 +1,32 @@
+name: 02 - Key Concepts Demo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  first-job:
+    name: First Job
+    runs-on: ubuntu-latest
+    steps:
+      - name: Simple step with echo
+        run: echo "This is a simple step in the first job"
+      
+      - name: Multi-line commands
+        run: |
+          echo "You can run multiple commands"
+          echo "In a single step"
+  
+  second-job:
+    name: Second Job
+    runs-on: ubuntu-latest
+    needs: first-job
+    steps:
+      - name: Using a predefined action
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.setOutput('current-time', new Date().toTimeString());
+            console.log('This action is running via GitHub Script!');
+      
+      - name: Show that this job runs after first-job
+        run: echo "This job runs only after first-job completes"

@@ -1,0 +1,60 @@
+name: 05 - Multiple Jobs Demo
+
+on: [workflow_dispatch]
+
+jobs:
+    build_job:
+        name: Build Job
+        runs-on: ubuntu-latest
+        steps:
+            - name: Install CowSay 
+              run: sudo apt-get install cowsay -y
+            - name: Execute CowSay
+              run: cowsay -f dragon "Run for cover, I'm a dragon!" > dragon.txt
+            # Output file contents for clarity
+            - name: Show generated file
+              run: cat dragon.txt
+            # Store output as a job output to demonstrate job outputs
+            - name: Set job output
+              id: dragon-output
+              run: echo "dragon-message=$(cat dragon.txt)" >> $GITHUB_OUTPUT
+    
+    test_job:
+        name: Test Job
+        needs: build_job
+        runs-on: ubuntu-latest
+        steps:
+            # Create our own test file since artifacts aren't being used in this basic example
+            - name: Create test file
+              run: echo "This is a test file" > test-file.txt
+            - name: Test file exists
+              run: test -f test-file.txt && echo "✅ File exists" || echo "❌ File does not exist"
+    
+    # Job running in parallel with test_job
+    lint_job:
+        name: Lint Job
+        runs-on: ubuntu-latest
+        # Independent job - intentionally has no "needs" dependency
+        steps:
+            - name: Run linting simulation
+              run: |
+                echo "Running linter..."
+                echo "No issues found!"
+
+    deploy_job:
+        name: Deploy Job
+        needs: [test_job, lint_job]  # This job needs both test and lint to complete
+        runs-on: ubuntu-latest
+        steps:
+            # Simulate deployment without needing artifacts from previous steps
+            - name: Deploy
+              run: |
+                echo "Deploying application..."
+                echo "Creating simulated deployment..."
+                mkdir -p deploy
+                echo "App version: 1.0.0" > deploy/version.txt
+                echo "Deployment timestamp: $(date)" >> deploy/version.txt
+                cat deploy/version.txt
+                echo "Deployment successful!"
+            - name: Send notification
+              run: echo "Deployment notification sent!"

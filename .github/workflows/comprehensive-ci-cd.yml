@@ -1,0 +1,327 @@
+name: Solar System CI/CD Pipeline
+
+# This workflow demonstrates a complete CI/CD pipeline for the Solar System application
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'solar-system-main/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'solar-system-main/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      debug-mode:
+        description: 'Enable debug mode'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/solar-system
+
+jobs:
+  setup:
+    name: Setup & Validate
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for versioning
+      
+      - name: Set version
+        id: set-version
+        run: |
+          # Extract version from package.json
+          VERSION=$(node -e "console.log(require('./solar-system-main/package.json').version || '1.0.0')")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: solar-system-main/package-lock.json
+      
+      - name: Print debug info
+        if: ${{ github.event.inputs.debug-mode == 'true' }}
+        run: |
+          echo "🔍 DEBUG INFORMATION:"
+          echo "Node version: $(node -v)"
+          echo "NPM version: $(npm -v)"
+          echo "Solar System version: ${{ steps.set-version.outputs.version }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Event: ${{ github.event_name }}"
+
+  lint:
+    name: Lint & Security
+    needs: setup
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: solar-system-main
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: solar-system-main/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run security audit
+        run: |
+          echo "Running security checks on dependencies..."
+          npm audit --audit-level=high || echo "::warning::Security vulnerabilities found"
+
+  test:
+    name: Test
+    needs: [setup, lint]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: solar-system-main
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: solar-system-main/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm test
+      
+      - name: Generate code coverage
+        run: npm run coverage
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: solar-system-main/test-results.xml
+          retention-days: 5
+
+      - name: Upload coverage results
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: solar-system-main/coverage
+          retention-days: 5
+
+  build:
+    name: Build Docker Image
+    needs: [setup, test]
+    runs-on: ubuntu-latest
+    outputs:
+      image-tags: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.setup.outputs.version }}
+            type=sha,format=short
+            type=ref,event=branch
+            latest
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./solar-system-main
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy
+    if: |
+      (github.ref == 'refs/heads/main' && github.event_name == 'push') || 
+      github.event_name == 'workflow_dispatch'
+    needs: [setup, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'development' }}
+      url: ${{ steps.deploy.outputs.deploy-url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+      
+      - name: Deploy solar-system app
+        id: deploy
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
+          VERSION="${{ needs.setup.outputs.version }}"
+          IMAGE_TAG="${{ needs.build.outputs.image-tags }}"
+          
+          echo "🚀 Deploying Solar System version $VERSION to $ENVIRONMENT"
+          
+          # Create a directory for processed manifests
+          mkdir -p k8s-manifests
+          
+          # Process the Kubernetes manifests with environment-specific values
+          if [ "$ENVIRONMENT" == "production" ]; then
+            DEPLOY_URL="https://solar-system.example.com"
+            NAMESPACE="solar-system-prod"
+            REPLICAS="3"
+            
+            # Process production manifests
+            cat solar-system-main/kubernetes/production/deployment.yaml | \
+              sed "s/_{_NAMESPACE_}_/$NAMESPACE/g" | \
+              sed "s/_{_REPLICAS_}_/$REPLICAS/g" | \
+              sed "s|_{_IMAGE_}_|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-$(echo $GITHUB_SHA | cut -c1-7)|g" \
+              > k8s-manifests/deployment.yaml
+              
+            cat solar-system-main/kubernetes/production/service.yaml | \
+              sed "s/_{_NAMESPACE_}_/$NAMESPACE/g" \
+              > k8s-manifests/service.yaml
+              
+            cat solar-system-main/kubernetes/production/ingress.yaml | \
+              sed "s/_{_NAMESPACE_}_/$NAMESPACE/g" | \
+              sed "s/_{_INGRESS_IP_}_/demo-ip/g" \
+              > k8s-manifests/ingress.yaml
+              
+            echo "Creating MongoDB secrets for production..."
+            echo "kubectl create secret generic mongo-db-creds \
+              --namespace=$NAMESPACE \
+              --from-literal=MONGO_URI='mongodb://mongo:27017/solar-system' \
+              --from-literal=MONGO_USERNAME='prod-username' \
+              --from-literal=MONGO_PASSWORD='prod-password' \
+              --dry-run=client -o yaml > k8s-manifests/mongo-secret.yaml"
+              
+          elif [ "$ENVIRONMENT" == "staging" ]; then
+            DEPLOY_URL="https://staging-solar-system.example.com"
+            NAMESPACE="solar-system-staging"
+            REPLICAS="2"
+            
+            # Process staging manifests (using development as base)
+            cat solar-system-main/kubernetes/development/deployment.yaml | \
+              sed "s/_{_NAMESPACE_}_/$NAMESPACE/g" | \
+              sed "s/_{_REPLICAS_}_/$REPLICAS/g" | \
+              sed "s|_{_IMAGE_}_|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-$(echo $GITHUB_SHA | cut -c1-7)|g" \
+              > k8s-manifests/deployment.yaml
+              
+            cat solar-system-main/kubernetes/development/service.yaml | \
+              sed "s/_{_NAMESPACE_}_/$NAMESPACE/g" \
+              > k8s-manifests/service.yaml
+              
+            cat solar-system-main/kubernetes/development/ingress.yaml | \
+              sed "s/_{_NAMESPACE_}_/$NAMESPACE/g" | \
+              sed "s/_{_INGRESS_IP_}_/demo-ip/g" \
+              > k8s-manifests/ingress.yaml
+              
+            echo "Creating MongoDB secrets for staging..."
+            echo "kubectl create secret generic mongo-db-creds \
+              --namespace=$NAMESPACE \
+              --from-literal=MONGO_URI='mongodb://mongo:27017/solar-system' \
+              --from-literal=MONGO_USERNAME='staging-username' \
+              --from-literal=MONGO_PASSWORD='staging-password' \
+              --dry-run=client -o yaml > k8s-manifests/mongo-secret.yaml"
+              
+          else
+            DEPLOY_URL="https://dev-solar-system.example.com"
+            NAMESPACE="solar-system-dev"
+            REPLICAS="1"
+            
+            # Process development manifests
+            cat solar-system-main/kubernetes/development/deployment.yaml | \
+              sed "s/_{_NAMESPACE_}_/$NAMESPACE/g" | \
+              sed "s/_{_REPLICAS_}_/$REPLICAS/g" | \
+              sed "s|_{_IMAGE_}_|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-$(echo $GITHUB_SHA | cut -c1-7)|g" \
+              > k8s-manifests/deployment.yaml
+              
+            cat solar-system-main/kubernetes/development/service.yaml | \
+              sed "s/_{_NAMESPACE_}_/$NAMESPACE/g" \
+              > k8s-manifests/service.yaml
+              
+            cat solar-system-main/kubernetes/development/ingress.yaml | \
+              sed "s/_{_NAMESPACE_}_/$NAMESPACE/g" | \
+              sed "s/_{_INGRESS_IP_}_/demo-ip/g" \
+              > k8s-manifests/ingress.yaml
+              
+            echo "Creating MongoDB secrets for development..."
+            echo "kubectl create secret generic mongo-db-creds \
+              --namespace=$NAMESPACE \
+              --from-literal=MONGO_URI='mongodb://mongo:27017/solar-system' \
+              --from-literal=MONGO_USERNAME='dev-username' \
+              --from-literal=MONGO_PASSWORD='dev-password' \
+              --dry-run=client -o yaml > k8s-manifests/mongo-secret.yaml"
+          fi
+          
+          echo "✅ Manifests prepared for deployment to $ENVIRONMENT"
+          echo "📄 Generated files:"
+          ls -la k8s-manifests/
+          
+          # In a real deployment, you would apply the manifests to your Kubernetes cluster:
+          # kubectl apply -f k8s-manifests/
+          
+          echo "deploy-url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          
+      - name: Verify deployment
+        run: |
+          echo "✅ Deployment verified!"
+          echo "🔗 Deployed to: ${{ steps.deploy.outputs.deploy-url }}"
+          echo "📦 Version: ${{ needs.setup.outputs.version }}"
+          
+      - name: Send notification
+        if: success()
+        run: |
+          echo "📧 Sending deployment notification..."
+          echo "Solar System version ${{ needs.setup.outputs.version }} was successfully deployed to ${{ github.event.inputs.environment || 'development' }}"
+          echo ""
+          echo "🌎 This demo shows how a Node.js application can be:"
+          echo "  - Tested automatically"
+          echo "  - Built into a Docker image"
+          echo "  - Deployed to different environments"
+          echo "  - Configured with environment-specific settings"

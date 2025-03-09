@@ -1,0 +1,36 @@
+name: 12c - Self-Hosted Runner Demo
+on: workflow_dispatch
+
+jobs:
+  # This job is commented out because it requires a self-hosted runner
+  # Uncomment when you have set up a self-hosted runner
+  # self-hosted-job:
+  #   runs-on: self-hosted
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     
+  #     - name: Show runner environment
+  #       run: |
+  #         echo "Running on self-hosted runner"
+  #         echo "Hostname: $(hostname)"
+  #         echo "OS: $(uname -a)"
+  #         echo "Current directory: $(pwd)"
+  #         echo "Available disk space:"
+  #         df -h
+  
+  # This job will always run on GitHub-hosted runner
+  github-hosted-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Info about self-hosted runners
+        run: |
+          echo "Self-hosted runners provide custom environments for specific needs"
+          echo "You can set up self-hosted runners by going to:"
+          echo "Repository Settings → Actions → Runners → New self-hosted runner"
+          echo ""
+          echo "Self-hosted runners are useful for:"
+          echo "- Access to internal resources not available from GitHub-hosted runners"
+          echo "- Custom hardware configurations (e.g., GPU access)"
+          echo "- Specialized software requirements"
+          echo "- Larger disk space or memory requirements"

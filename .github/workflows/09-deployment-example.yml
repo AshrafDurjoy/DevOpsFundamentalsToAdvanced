@@ -1,0 +1,61 @@
+name: 09 - Simple Deployment Demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build for deployment
+        run: |
+          echo "Building application..."
+          # Create a dummy build artifact
+          mkdir -p dist
+          echo "<html><body><h1>Hello from ${{ github.workflow }}</h1></body></html>" > dist/index.html
+          echo "build-version=1.0.$(date +%s)" >> $GITHUB_OUTPUT
+        id: build
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-files
+          path: dist/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Use environments for deployment approvals and secrets
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: website-files
+          path: dist
+      
+      - name: Deploy to ${{ github.event.inputs.environment }}
+        run: |
+          echo "🚀 Deploying to ${{ github.event.inputs.environment }}..."
+          echo "📂 Files to deploy:"
+          ls -la dist/
+          
+          # Simulate different deployment methods
+          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            echo "🔒 Using production deployment credentials"
+            echo "✅ Production deployment completed! Website is now live at https://example.com"
+          else
+            echo "🔧 Using staging deployment credentials"
+            echo "✅ Staging deployment completed! Website is now available at https://staging.example.com"
+          fi

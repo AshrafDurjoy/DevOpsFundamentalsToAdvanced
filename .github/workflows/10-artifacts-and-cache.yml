@@ -1,0 +1,75 @@
+name: 10 - Artifacts and Cache Demo
+
+
+on: [push]
+
+jobs:
+  cache-demo:
+    name: Demonstrate Caching
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      # Cache dependencies based on package-lock.json hash
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      
+      - name: Simulate npm install with cache
+        run: |
+          echo "Installing dependencies (would be faster with cache hit)..."
+          mkdir -p node_modules
+          echo "// Simulated dependencies" > node_modules/simulated-package.js
+          echo "Dependencies installed!"
+
+  artifacts-demo:
+    name: Demonstrate Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create multiple artifacts
+        run: |
+          mkdir -p artifacts/logs artifacts/reports
+          echo "Log data at $(date)" > artifacts/logs/application.log
+          echo "Report generated at $(date)" > artifacts/reports/summary.txt
+      
+      # Upload multiple artifacts separately
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-logs
+          path: artifacts/logs/
+          retention-days: 3
+      
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-reports
+          path: artifacts/reports/
+          retention-days: 3
+
+  use-artifacts:
+    name: Use Downloaded Artifacts
+    needs: artifacts-demo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Show artifact contents
+        run: |
+          echo "Downloaded artifacts:"
+          find . -type f | sort
+          echo "Log content:"
+          cat application-logs/application.log
+          echo "Report content:"
+          cat application-reports/summary.txt
