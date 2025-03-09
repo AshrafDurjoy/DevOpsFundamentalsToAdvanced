@@ -494,7 +494,9 @@ jobs:
     if: |
       contains(github.ref, 'workflow') ||
       github.event.inputs.demo-mode == 'true' || 
-      (github.event.inputs.setup-dynamodb != false && github event_name != 'pull_request')
+      (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request')
+    outputs:
+      instance-profile-name: ${{ steps.create-role.outputs.instance-profile-name }}
     
     steps:
       - name: Configure AWS credentials
@@ -507,6 +509,7 @@ jobs:
           mask-aws-account-id: true
       
       - name: Create IAM role for EC2
+        id: create-role
         run: |
           ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
           ROLE_NAME="SolarSystemEC2Role-${ENVIRONMENT}"
@@ -612,7 +615,13 @@ jobs:
       - name: Verify IAM Instance Profile exists
         run: |
           ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
-          INSTANCE_PROFILE_NAME="SolarSystemInstanceProfile-${ENVIRONMENT}"
+          # Reference the output from setup-ec2-role job instead of hardcoding
+          INSTANCE_PROFILE_NAME="${{ needs.setup-ec2-role.outputs.instance-profile-name }}"
+          
+          if [ -z "$INSTANCE_PROFILE_NAME" ]; then
+            # Fallback to the constructed name if output is empty
+            INSTANCE_PROFILE_NAME="SolarSystemInstanceProfile-${ENVIRONMENT}"
+          fi
           
           echo "Checking if instance profile exists: $INSTANCE_PROFILE_NAME"
           if ! aws iam get-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME &>/dev/null; then
@@ -621,6 +630,7 @@ jobs:
             exit 1
           fi
           echo "✅ Found IAM Instance Profile: $INSTANCE_PROFILE_NAME"
+          echo "instance-profile-name=$INSTANCE_PROFILE_NAME" >> $GITHUB_ENV
       
       - name: Create or update EC2 instance
         id: create-ec2
@@ -675,7 +685,7 @@ jobs:
                 KeyName: ${{ secrets.EC2_KEY_NAME }}
                 SecurityGroups:
                   - !Ref SolarSystemSecurityGroup
-                IamInstanceProfile: SolarSystemInstanceProfile-${ENVIRONMENT}
+                IamInstanceProfile: ${{ env.instance-profile-name }}
                 UserData:
                   Fn::Base64: |
                     #!/bin/bash
