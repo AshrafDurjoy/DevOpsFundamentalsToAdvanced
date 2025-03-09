@@ -5,13 +5,15 @@ name: Solar System - AWS EC2 Deployment
 
 on:
   push:
-    branches: [main, develop]
-    paths:
-      - 'solar-system-main/**'
+    branches: [main, develop, master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
-    branches: [main, develop]
-    paths:
-      - 'solar-system-main/**'
+    branches: [main, develop, master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
     inputs:
       environment:
@@ -32,6 +34,12 @@ on:
         required: false
         type: boolean
         default: true
+
+# Add permissions needed for GitHub Actions
+permissions:
+  contents: read
+  packages: write
+  id-token: write
 
 env:
   NODE_VERSION: '18'
@@ -344,122 +352,183 @@ jobs:
           ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
           STACK_NAME="solar-system-ec2-${ENVIRONMENT}"
           
-          # Copy CloudFormation template from the repository
-          cp cloudformation-templates/ec2-setup.yml ec2-template.yml
-          rsion: '2010-09-09'
-          # Check if stack already existsmplate for Solar System EC2 instance with Docker'
+          # Create CloudFormation template inline (don't rely on external file)
+          cat > ec2-template.yml << EOF
+          AWSTemplateFormatVersion: '2010-09-09'
+          Description: 'CloudFormation template for Solar System EC2 instance with Docker'
+          
+          Parameters:
+            EnvironmentName:
+              Type: String
+              Default: ${ENVIRONMENT}
+            
+            KeyPairName:
+              Type: String
+              Default: ${{ secrets.EC2_KEY_NAME }}
+          
+          Resources:
+            SolarSystemSecurityGroup:
+              Type: 'AWS::EC2::SecurityGroup'
+              Properties:
+                GroupDescription: Security group for Solar System application
+                SecurityGroupIngress:
+                  - IpProtocol: tcp
+                    FromPort: 22
+                    ToPort: 22
+                    CidrIp: 0.0.0.0/0
+                    Description: SSH access
+                  - IpProtocol: tcp
+                    FromPort: 80
+                    ToPort: 80
+                    CidrIp: 0.0.0.0/0
+                    Description: HTTP access
+                  - IpProtocol: tcp
+                    FromPort: 3000
+                    ToPort: 3000
+                    CidrIp: 0.0.0.0/0
+                    Description: Application port
+                Tags:
+                  - Key: Name
+                    Value: solar-system-sg-${ENVIRONMENT}
+            
+            SolarSystemInstance:
+              Type: 'AWS::EC2::Instance'
+              Properties:
+                ImageId: ami-0261755bbcb8c4a84  # Amazon Linux 2023 AMI
+                InstanceType: t2.micro
+                KeyName: ${{ secrets.EC2_KEY_NAME }}
+                SecurityGroups:
+                  - !Ref SolarSystemSecurityGroup
+                IamInstanceProfile: SolarSystemInstanceProfile-${ENVIRONMENT}
+                UserData:
+                  Fn::Base64: |
+                    #!/bin/bash
+                    yum update -y
+                    yum install docker -y
+                    systemctl start docker
+                    systemctl enable docker
+                    usermod -aG docker ec2-user
+                    mkdir -p /home/ec2-user/solar-system
+                    chown ec2-user:ec2-user /home/ec2-user/solar-system
+                Tags:
+                  - Key: Name
+                    Value: solar-system-${ENVIRONMENT}
+          
+          Outputs:
+            InstanceId:
+              Description: ID of the EC2 instance
+              Value: !Ref SolarSystemInstance
+            PublicIP:
+              Description: Public IP address of the EC2 instance
+              Value: !GetAtt SolarSystemInstance.PublicIp
+          EOF
+          
+          # Check if stack already exists
           if aws cloudformation describe-stacks --stack-name $STACK_NAME 2>&1 | grep -q "Stack with id $STACK_NAME does not exist"; then
             echo "Creating new CloudFormation stack: $STACK_NAME"
             aws cloudformation create-stack \
               --stack-name $STACK_NAME \
               --template-body file://ec2-template.yml \
-              --parameters \
-                ParameterKey=EnvironmentName,ParameterValue=${ENVIRONMENT} \
-                ParameterKey=KeyPairName,ParameterValue="${{ secrets.EC2_KEY_NAME }}" \
-              --capabilities CAPABILITY_NAMED_IAM}
+              --capabilities CAPABILITY_NAMED_IAM
               
             # Wait for stack creation to complete
             aws cloudformation wait stack-create-complete --stack-name $STACK_NAME
-          elseWS::EC2::SecurityGroup'
+          else
             echo "Updating existing CloudFormation stack: $STACK_NAME"
-            aws cloudformation update-stack \ application
+            aws cloudformation update-stack \
               --stack-name $STACK_NAME \
               --template-body file://ec2-template.yml \
-              --parameters \: 22
-                ParameterKey=EnvironmentName,ParameterValue=${ENVIRONMENT} \
-                ParameterKey=KeyPairName,ParameterValue="${{ secrets.EC2_KEY_NAME }}" \
               --capabilities CAPABILITY_NAMED_IAM || echo "No updates are to be performed"
-              Protocol: tcp
+              
             # Wait for stack update to complete if an update was performed
             aws cloudformation wait stack-update-complete --stack-name $STACK_NAME || true
-          fi   CidrIp: 0.0.0.0/0
-                    Description: HTTP access
+          fi
+          
           # Get instance ID and public IP from stack outputs
           INSTANCE_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)
           PUBLIC_IP=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='PublicIP'].OutputValue" --output text)
-                    CidrIp: 0.0.0.0/0
           echo "Created/updated EC2 instance with ID: $INSTANCE_ID and Public IP: $PUBLIC_IP"
           echo "instance-id=$INSTANCE_ID" >> $GITHUB_OUTPUT
           echo "public-ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
-                    Value: solar-system-sg-${ENVIRONMENT}
+          
           # Update environment variables for deployment
           if [ "$ENVIRONMENT" == "production" ]; then
             echo "PROD_EC2_HOST=$PUBLIC_IP" >> $GITHUB_ENV
-          elseProperties:
+          else
             echo "DEV_EC2_HOST=$PUBLIC_IP" >> $GITHUB_ENV
-          fie: t2.micro
-                KeyName: ${KeyPairName}
+          fi
+          
           # Wait for SSH to be available
           echo "Waiting for SSH to become available..."
-          for i in {1..30}; dofile: SolarSystemInstanceProfile-${ENVIRONMENT}
+          for i in {1..30}; do
             if nc -z $PUBLIC_IP 22; then
               echo "SSH is now available!"
-              break #!/bin/bash
-            fi      yum update -y
+              break
+            fi
             if [ $i -eq 30 ]; then
               echo "Timeout waiting for SSH to become available"
-              exit 1systemctl enable docker
+              exit 1
             fi
-            echo "Waiting for SSH... attempt $i/30"ystem
-            sleep 10:ec2-user /home/ec2-user/solar-system
+            echo "Waiting for SSH... attempt $i/30"
+            sleep 10
           done
-                  - Key: Name
-  # EC2 DEPLOYMENT PHASEe: solar-system-${ENVIRONMENT}
+      
+  # EC2 DEPLOYMENT PHASE
   deploy-to-ec2:
     name: Deploy to EC2 Instance
     needs: [build-docker, setup-dynamodb, setup-ec2-role, provision-ec2]
-    if: |     Description: ID of the EC2 instance
+    if: |
       github.event_name != 'pull_request' && 
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest Public IP address of the EC2 instance
-    environment:nce.PublicIp
+    runs-on: ubuntu-latest
+    environment:
       name: ${{ github.event.inputs.environment || 'development' }}
       url: ${{ steps.deploy-details.outputs.app-url }}
-          # Check if stack already exists
-    steps:oudformation describe-stacks --stack-name $STACK_NAME 2>&1 | grep -q "Stack with id $STACK_NAME does not exist"; then
-      - name: Checkout codetack: $STACK_NAME"
-        uses: actions/checkout@v4eate-stack \
-      e $STACK_NAME \
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
       - name: Set environment variables
         id: env-vars
         run: |
           ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
           
           # Use the newly provisioned EC2 instance
-          EC2_HOST="${{ needs.provision-ec2.outputs.ec2-public-ip }}"_NAME"
-          ck \
-          # Different configurations based on environmenttack-name $STACK_NAME \
+          EC2_HOST="${{ needs.provision-ec2.outputs.ec2-public-ip }}"
+          
+          # Different configurations based on environment
           if [ "$ENVIRONMENT" == "production" ]; then
             echo "ec2-host=$EC2_HOST" >> $GITHUB_OUTPUT
             echo "dynamodb-table=solar-system-planets-production" >> $GITHUB_OUTPUT
-            echo "app-url=http://$EC2_HOST:3000" >> $GITHUB_OUTPUTrformed
-          else  aws cloudformation wait stack-update-complete --stack-name $STACK_NAME || true
+            echo "app-url=http://$EC2_HOST:3000" >> $GITHUB_OUTPUT
+          else
             echo "ec2-host=$EC2_HOST" >> $GITHUB_OUTPUT
             echo "dynamodb-table=solar-system-planets-development" >> $GITHUB_OUTPUT
             echo "app-url=http://$EC2_HOST:3000" >> $GITHUB_OUTPUT
-          fi --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)
-      uery "Stacks[0].Outputs[?OutputKey=='PublicIP'].OutputValue" --output text)
+          fi
+      
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4blic IP: $PUBLIC_IP"
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}pdate environment variables for deployment
-          if [ "$ENVIRONMENT" == "production" ]; then
-      - name: Generate application deployment scriptUB_ENV
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Generate application deployment script
         run: |
           # Create a deployment script that will run on the EC2 instance
           cat > deploy.sh << 'EOL'
           #!/bin/bash
           # Log all commands for debugging
-          set -xWaiting for SSH to become available..."
+          set -x
           # Pull the new Docker image
-          docker pull ${IMAGE_URL}; then
+          docker pull ${IMAGE_URL}
           # Stop and remove the existing container if it's running
           docker stop solar-system || true
           docker rm solar-system || true
           # Run the new container with environment variables
-          docker run -d --name solar-system \o become available"
+          docker run -d --name solar-system \
             -p 3000:3000 \
             -e AWS_REGION="${AWS_REGION}" \
             -e DYNAMODB_TABLE="${DYNAMODB_TABLE}" \
@@ -468,26 +537,26 @@ jobs:
           # Check if container started successfully
           if [ "$(docker ps -q -f name=solar-system)" ]; then
             echo "Container started successfully!"
-          elseeate a deployment script that will run on the EC2 instance
+          else
             echo "Failed to start container"
-            exit 1ash
-          fiLog all commands for debugging
-          EOL -x
-          # Pull the new Docker image
-          chmod +x deploy.shE_URL}
-          # Stop and remove the existing container if it's running
+            exit 1
+          fi
+          EOL
+          # Make the script executable
+          chmod +x deploy.sh
+      
       - name: Copy deployment script to EC2
         uses: appleboy/scp-action@master
-        with:un the new container with environment variables
+        with:
           host: ${{ steps.env-vars.outputs.ec2-host }}
           username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }} \
-          source: "deploy.sh"="${DYNAMODB_TABLE}" \
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy.sh"
           target: "/home/${{ secrets.EC2_USERNAME }}"
-            ${IMAGE_URL}
-      - name: Deploy to EC2ner started successfully
-        uses: appleboy/ssh-action@masterolar-system)" ]; then
-        with:cho "Container started successfully!"
+      
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
           host: ${{ steps.env-vars.outputs.ec2-host }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
@@ -497,26 +566,6 @@ jobs:
             AWS_REGION=${{ secrets.AWS_REGION }}
             DYNAMODB_TABLE=${{ steps.env-vars.outputs.dynamodb-table }}
             ENVIRONMENT=${{ github.event.inputs.environment || 'development' }}
-          script: |boy/scp-action@master
-            # Run the deployment script
-            cd /home/${{ secrets.EC2_USERNAME }}ost }}
-            chmod +x deploy.shs.EC2_USERNAME }}
-            ./deploy.shets.EC2_SSH_KEY }}
-          source: "deploy.sh"
-      - name: Deployment detailsrets.EC2_USERNAME }}"
-        id: deploy-details
-        run: |Deploy to EC2
-          echo "🚀 Deployed to EC2 instance!"
-          echo "app-url=${{ steps.env-vars.outputs.app-url }}" >> $GITHUB_OUTPUT
-          host: ${{ steps.env-vars.outputs.ec2-host }}
-      - name: Send notification.EC2_USERNAME }}
-        run: | ${{ secrets.EC2_SSH_KEY }}
-          echo "📧 Deployment notification:"
-          echo "Solar System application has been deployed to ${{ github.event.inputs.environment || 'development' }}"
-          echo "URL: ${{ steps.env-vars.outputs.app-url }}:3000"${{ needs.build-docker.outputs.image-tag }}
-          echo "Deployment Date: $(date)"GION }}
-          echo ""ODB_TABLE=${{ steps.env-vars.outputs.dynamodb-table }}
-          echo "This deployment uses Amazon DynamoDB for storing planet data"}}
           script: |
             # Run the deployment script
             cd /home/${{ secrets.EC2_USERNAME }}
