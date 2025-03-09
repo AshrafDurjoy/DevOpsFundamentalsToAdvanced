@@ -149,11 +149,11 @@ jobs:
       
       - name: Update test command to use mock
         run: |
-          # Create a direct test command that uses our mock setup
+          # Create a direct test command that uses our mock setup with npx to run local packages
           cat > run-tests.sh << 'EOF'
           #!/bin/bash
-          # Use the original test command from package.json but add our require
-          NODE_ENV=test mocha --require ./test-setup.js app-test.js --timeout 10000 --reporter mocha-junit-reporter --exit
+          # Use the original test command from package.json but add our require and use npx
+          NODE_ENV=test npx mocha --require ./test-setup.js app-test.js --timeout 10000 --reporter mocha-junit-reporter --exit
           EOF
           chmod +x run-tests.sh
           
@@ -170,10 +170,10 @@ jobs:
         
       - name: Generate code coverage
         run: |
-          # Create a coverage script that uses our mock setup
+          # Create a coverage script that uses our mock setup with npx
           cat > run-coverage.sh << 'EOF'
           #!/bin/bash
-          NODE_ENV=test nyc --reporter=lcov --reporter=text-summary ./run-tests.sh
+          NODE_ENV=test npx nyc --reporter=lcov --reporter=text-summary ./run-tests.sh
           EOF
           chmod +x run-coverage.sh
           ./run-coverage.sh || echo "Coverage generation skipped"
