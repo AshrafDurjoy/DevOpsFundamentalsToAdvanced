@@ -67,10 +67,7 @@ jobs:
           cache-dependency-path: solar-system-main/package-lock.json
       
       - name: Install dependencies
-        run: npm ci
-      
-      - name: Install sinon for testing
-        run: npm install --save sinon
+        run: npm install --no-audit
       
       - name: Configure environment for tests
         run: |
