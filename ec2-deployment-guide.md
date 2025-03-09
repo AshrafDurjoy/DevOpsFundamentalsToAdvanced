@@ -49,6 +49,109 @@ In your GitHub repository:
    - `EC2_USERNAME`: Username for SSH (use "ec2-user" for Amazon Linux)
    - `EC2_SSH_KEY`: The entire contents of your private key file (solar-system-keypair.pem)
 
+## Full GitHub Setup for Running the Workflow
+
+Before running the workflow, ensure you have completed the following GitHub setup:
+
+### 1. Repository Configuration
+
+1. **Repository Structure**:
+   - Ensure the repository contains the `solar-system-main` directory with your application
+   - The application should include a valid `package.json` file and all required code
+   - Make sure `.github/workflows/solar-system-ec2.yml` workflow file is present
+
+2. **Branch Protection (Optional but Recommended)**:
+   - Go to Settings → Branches → Branch protection rules
+   - Add protection for your main branch
+   - Require pull request reviews before merging
+   - Require status checks to pass
+
+### 2. Enable GitHub Packages
+
+1. **Check Repository Permissions**:
+   - Go to Settings → Actions → General
+   - Ensure "Read and write permissions" is selected under "Workflow permissions"
+   - Check "Allow GitHub Actions to create and approve pull requests"
+
+2. **GitHub Container Registry Access**:
+   - Go to Settings → Packages
+   - Ensure package creation is enabled for the repository
+   - Review inheritance settings for package access
+
+### 3. Required GitHub Secrets
+
+Create these secrets in your repository (Settings → Secrets and variables → Actions):
+
+**AWS Authentication**:
+- `AWS_ACCESS_KEY_ID`: Your AWS access key
+- `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
+- `AWS_REGION`: Your AWS region (e.g., `us-east-1`)
+
+**EC2 Access**:
+- `EC2_KEY_NAME`: Name of your EC2 key pair (e.g., `solar-system-keypair`)
+- `EC2_USERNAME`: Username for SSH (use `ec2-user` for Amazon Linux)
+- `EC2_SSH_KEY`: The entire contents of your private key file including header/footer lines
+
+### 4. AWS Resources Prerequisites
+
+1. **IAM User**:
+   - Create an IAM user with programmatic access
+   - Attach these policies (or create a custom policy):
+     - `AmazonEC2FullAccess`
+     - `AmazonDynamoDBFullAccess`
+     - `IAMFullAccess`
+     - `AWSCloudFormationFullAccess`
+
+2. **EC2 Key Pair**:
+   - Create an EC2 key pair in the AWS Console
+   - Download and secure the private key (.pem file)
+   - Run `chmod 400` on the key file to set correct permissions
+
+3. **Account Limits**:
+   - Ensure your AWS account has sufficient service limits for:
+     - EC2 t2.micro instances
+     - DynamoDB tables
+     - IAM roles and policies
+
+### 5. Running the Workflow
+
+For instructional demos, use these settings when manually triggering the workflow:
+
+1. Go to Actions → "Solar System - AWS EC2 Deployment"
+2. Click "Run workflow"
+3. Configure with these options:
+   - **Use workflow from**: Your current branch
+   - **Environment**: `development` (faster to provision)
+   - **Enable debug mode**: `true` (check this)
+   - **Setup DynamoDB tables**: `true` (check this)
+   - **Run in demo mode**: `true` (check this to ensure all steps run)
+
+### 6. Troubleshooting
+
+If the workflow doesn't run all steps successfully:
+
+1. **Check Debug Job Output**:
+   - Examine the "Debug Workflow Environment" job output
+   - Verify branch detection and environment variables
+
+2. **Verify AWS Credentials**:
+   - Ensure AWS credentials are correct and have necessary permissions
+   - Check if credentials have expired or been revoked
+
+3. **Test AWS CLI Access**:
+   - If possible, test AWS access with the same credentials locally
+   - Ensure region configuration matches your intended deployment target
+
+4. **GitHub Action Logs**:
+   - Check individual job steps for detailed error messages
+   - Look for permission issues or failed API calls
+
+5. **Common Issues**:
+   - `403 Forbidden`: Check GitHub Packages permissions
+   - `AWS credential errors`: Verify AWS secret key and access key
+   - `Resource creation failures`: Check AWS service quotas/limits 
+   - `SSH connection timeouts`: Ensure security groups allow SSH access
+
 ## Step 3: Understanding the Workflow
 
 Our GitHub Actions workflow handles the complete deployment process with no manual steps:
@@ -75,6 +178,33 @@ Our GitHub Actions workflow handles the complete deployment process with no manu
 - Connects to the provisioned EC2 instance
 - Pulls and runs Docker container with the application
 - Configures environment variables to connect to DynamoDB
+
+## Pre-Run Checklist
+
+Before triggering the workflow, verify these critical items:
+
+1. **GitHub Repository Structure**
+   - ✅ Repository contains `solar-system-main` directory with all application files
+   - ✅ Application has a `package.json` file and proper directory structure
+   - ✅ Workflow file `.github/workflows/solar-system-ec2.yml` exists
+
+2. **GitHub Secrets**
+   - ✅ All AWS credentials are set as secrets
+   - ✅ EC2 key pair name matches the key you created in AWS
+   - ✅ EC2_SSH_KEY includes complete private key content with `-----BEGIN RSA PRIVATE KEY-----` header
+
+3. **GitHub Permissions**
+   - ✅ Repository has Actions and Packages enabled
+   - ✅ Workflow permissions include "Read and write permissions"
+   - ✅ Repository has permission to create and use packages
+
+4. **AWS Resources**
+   - ✅ IAM user has all required permissions
+   - ✅ EC2 key pair is created and downloaded
+   - ✅ AWS region is consistent across all configurations
+   - ✅ Your AWS account has sufficient service quotas
+
+Use the Debug job output to verify that all environment variables and secrets are correctly set before proceeding with the full deployment.
 
 ## Step 4: Running the Workflow
 

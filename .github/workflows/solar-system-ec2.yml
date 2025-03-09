@@ -62,10 +62,18 @@ jobs:
           echo "🐛 DEBUG INFORMATION:"
           echo "Branch: ${{ github.ref }}"
           echo "Event name: ${{ github.event_name }}"
-          echo "Workflow branch: workflow"
+          echo "Repository: ${{ github.repository }}"
+          echo "Actor: ${{ github.actor }}"
           echo "Is workflow branch? ${{ contains(github.ref, 'workflow') }}"
           echo "Demo mode: ${{ github.event.inputs.demo-mode }}"
           echo "Setup DynamoDB: ${{ github.event.inputs.setup-dynamodb }}"
+          echo "Environment: ${{ github.event.inputs.environment || 'development' }}"
+          echo "AWS Region: ${{ secrets.AWS_REGION || 'not set' }}"
+          # Check if required secrets are set without exposing values
+          echo "AWS Access Key configured: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}"
+          echo "AWS Secret Key configured: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}"
+          echo "EC2 Key Name configured: ${{ secrets.EC2_KEY_NAME != '' }}"
+          echo "SSH Key configured: ${{ secrets.EC2_SSH_KEY != '' }}"
 
   # TESTING PHASE
   test:
@@ -359,6 +367,10 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.FULL_IMAGE_NAME }}:${{ steps.set-image-tag.outputs.image-tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Add a short timeout to avoid hanging builds
+          no-cache-filter: "node_modules"  # Don't cache node_modules
+          build-args: |
+            NODE_ENV=production
       
       - name: Image details
         if: github.event_name != 'pull_request'
@@ -400,6 +412,8 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+          # Add mask token to prevent secrets from leaking
+          mask-aws-account-id: true
       
       - name: Display setup information
         run: |
@@ -489,6 +503,8 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+          # Add mask token to prevent secrets from leaking
+          mask-aws-account-id: true
       
       - name: Create IAM role for EC2
         run: |
@@ -807,6 +823,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "deploy.sh"
           target: "/home/${{ secrets.EC2_USERNAME }}"
+          # Add timeout to avoid hanging if connection fails
+          timeout: 60s 
+          strip_components: 0
       
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
