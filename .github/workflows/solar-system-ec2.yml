@@ -5,7 +5,7 @@ name: Solar System - AWS EC2 Deployment
 
 on:
   push:
-    branches: [main, develop, master]
+    branches: ['*']  # Run on any branch push
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -34,6 +34,11 @@ on:
         required: false
         type: boolean
         default: true
+      demo-mode:
+        description: 'Run in demo mode (executes all steps)'
+        required: false
+        type: boolean
+        default: false
 
 # Add permissions needed for GitHub Actions
 permissions:
@@ -317,18 +322,24 @@ jobs:
         uses: docker/setup-buildx-action@v3
       
       - name: Login to GitHub Container Registry
-        if: github.event_name != 'pull_request'
+        # Run for any branch if demo-mode is true or for non-pull requests
+        if: github.event.inputs.demo-mode == 'true' || github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
+      - name: Skip notice for GitHub Container Registry login 
+        if: github.event.inputs.demo-mode != 'true' && github.event_name == 'pull_request'
+        run: echo "⏭️ Skipping login to GitHub Container Registry because this is a pull request"
+      
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./solar-system-main
-          push: ${{ github.event_name != 'pull_request' }}
+          # Push if demo-mode is true or not a pull request
+          push: ${{ github.event.inputs.demo-mode == 'true' || github.event_name != 'pull_request' }}
           tags: ${{ env.REGISTRY }}/${{ env.FULL_IMAGE_NAME }}:${{ steps.set-image-tag.outputs.image-tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -343,7 +354,8 @@ jobs:
   setup-dynamodb:
     name: Setup DynamoDB
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request' }}
+    # Run if demo-mode is true or if setup-dynamodb is true and not a pull request
+    if: ${{ github.event.inputs.demo-mode == 'true' || (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request') }}
     
     steps:
       - name: Checkout code
@@ -355,6 +367,13 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Display setup information
+        run: |
+          echo "🔍 Setting up DynamoDB"
+          echo "Event type: ${{ github.event_name }}"
+          echo "Setup DynamoDB input: ${{ github.event.inputs.setup-dynamodb }}"
+          echo "Environment: ${{ github.event.inputs.environment || 'development' }}"
       
       - name: Create DynamoDB table
         run: |
@@ -424,7 +443,8 @@ jobs:
     name: Setup EC2 IAM Role
     needs: setup-dynamodb
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request' }}
+    # Run if demo-mode is true or if setup-dynamodb is true and not a pull request
+    if: ${{ github.event.inputs.demo-mode == 'true' || (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request') }}
     
     steps:
       - name: Configure AWS credentials
@@ -511,7 +531,8 @@ jobs:
     name: Provision EC2 Instance
     needs: setup-ec2-role
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request' }}
+    # Run if demo-mode is true or if setup-dynamodb is true and not a pull request
+    if: ${{ github.event.inputs.demo-mode == 'true' || (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request') }}
     outputs:
       instance-id: ${{ steps.create-ec2.outputs.instance-id }}
       ec2-public-ip: ${{ steps.create-ec2.outputs.public-ip }}
@@ -526,6 +547,12 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Display provisioning information
+        run: |
+          echo "🔍 Provisioning EC2 Instance"
+          echo "Event type: ${{ github.event_name }}"
+          echo "Environment: ${{ github.event.inputs.environment || 'development' }}"
       
       - name: Create or update EC2 instance
         id: create-ec2
@@ -658,9 +685,8 @@ jobs:
   deploy-to-ec2:
     name: Deploy to EC2 Instance
     needs: [build-docker, setup-dynamodb, setup-ec2-role, provision-ec2]
-    if: |
-      github.event_name != 'pull_request' && 
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # Run if demo-mode is true or if not a pull request
+    if: ${{ github.event.inputs.demo-mode == 'true' || github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event.inputs.environment || 'development' }}

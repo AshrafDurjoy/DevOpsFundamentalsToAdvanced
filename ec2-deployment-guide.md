@@ -159,3 +159,62 @@ The application connects to DynamoDB using the AWS SDK, which automatically:
 3: Application queries data from DynamoDB
 4: Creates and populates DynamoDB tables
 ```
+
+## Instructor Guide: Ensuring All Jobs Run Successfully
+
+To ensure all workflow jobs run for demonstration purposes, follow these specific steps:
+
+### Triggering a Complete Workflow Run
+
+1. **Use the workflow_dispatch trigger**:
+   - Go to Actions → "Solar System - AWS EC2 Deployment"
+   - Click "Run workflow" dropdown
+   - Ensure these settings:
+     - **Use workflow from**: Select your current branch (no need to switch to main)
+     - **Environment**: `development` (for faster provisioning)
+     - **Enable debug mode**: `true` (check this box)
+     - **Setup DynamoDB tables**: `true` (this should be checked)
+     - **Run in demo mode**: `true` (this ensures all steps run)
+   - Click "Run workflow" button
+
+2. **Watch for all jobs to execute**:
+   - The demo mode ensures all jobs run regardless of branch
+   - You'll see progress indicators for:
+     - Test Application
+     - Build Docker Image
+     - Setup DynamoDB
+     - Setup EC2 IAM Role
+     - Provision EC2 Instance
+     - Deploy to EC2 Instance
+
+3. **Working from feature branches**:
+   - You can now demo the workflow from any branch
+   - Students can see the full deployment process from their own branches
+   - No need to merge to main for demonstrations
+
+4. **If any jobs are skipped or fail**:
+   - Ensure you're not triggering via pull request (which skips deployment)
+   - Check GitHub and AWS permissions
+   - Verify all AWS credentials are properly set up
+
+5. **Monitoring the deployment**:
+   - Follow the deployment job in real-time
+   - When complete, GitHub will show the environment URL
+   - Use the URL to demonstrate the running application
+
+6. **Clean up after demonstrations**:
+   - To avoid charges, delete resources when done:
+   ```bash
+   # Set environment to match what you used
+   ENV="development"  # or "production"
+   
+   # Delete CloudFormation stack
+   aws cloudformation delete-stack --stack-name "solar-system-ec2-$ENV"
+   
+   # Delete DynamoDB table
+   aws dynamodb delete-table --table-name "solar-system-planets-$ENV"
+   
+   # Delete IAM policy and role (might need to detach first)
+   POLICY_ARN=$(aws iam list-policies --query "Policies[?PolicyName=='SolarSystemDynamoDBAccess-$ENV'].Arn" --output text)
+   aws iam delete-policy --policy-arn "$POLICY_ARN"
+   ```
