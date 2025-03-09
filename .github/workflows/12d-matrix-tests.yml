@@ -2,10 +2,8 @@ name: 12d - Matrix Testing Demo
 
 
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+on: [push]
+
 
 jobs:
   test:
