@@ -138,16 +138,23 @@ jobs:
       
       - name: Update test command to use mock
         run: |
-          # Update the test command with the require flag to use our mock setup
-          if grep -q "\"test\":" package.json; then
-            sed -i 's/"test":.*mocha/"test": "NODE_ENV=test mocha --require .\/test-setup.js/' package.json
-            cat package.json
-          else
-            echo "Warning: Could not update test command in package.json, scripts.test not found"
-          fi
+          # Create a direct test command that uses our mock setup
+          cat > run-tests.sh << 'EOF'
+          #!/bin/bash
+          NODE_ENV=test mocha --require ./test-setup.js app-test.js --timeout 10000 --reporter mocha-junit-reporter --exit
+          EOF
+          chmod +x run-tests.sh
+          
+          # Verify current package.json
+          echo "Current package.json content:"
+          cat package.json
+          
+          # Extract the current test script
+          TEST_CMD=$(node -e "console.log(require('./package.json').scripts.test || '')")
+          echo "Current test command: $TEST_CMD"
       
       - name: Run tests
-        run: npm test
+        run: ./run-tests.sh
         
       - name: Generate code coverage
         run: npm run coverage || echo "Coverage generation skipped"
