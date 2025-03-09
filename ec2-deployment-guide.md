@@ -348,3 +348,85 @@ To ensure all workflow jobs run for demonstration purposes, follow these specifi
    POLICY_ARN=$(aws iam list-policies --query "Policies[?PolicyName=='SolarSystemDynamoDBAccess-$ENV'].Arn" --output text)
    aws iam delete-policy --policy-arn "$POLICY_ARN"
    ```
+
+## Detailed AWS Setup Instructions
+
+### Creating an IAM User with Required Permissions
+
+1. **Log into AWS Management Console**:
+   - Go to https://console.aws.amazon.com/
+   - Sign in with your AWS account
+
+2. **Navigate to IAM Service**:
+   - In the search bar at the top, type "IAM" and select it from the results
+   - Or find IAM under "Security, Identity, & Compliance" section
+
+3. **Create a New IAM User**:
+   - In the IAM dashboard, click on "Users" in the left sidebar
+   - Click the "Create user" button
+   - Enter a username (e.g., `solar-system-deployment`)
+   - Check the box for "Access key - Programmatic access"
+   - Click "Next: Permissions"
+
+4. **Attach Required Permissions**:
+   - On the permissions page, select "Attach existing policies directly"
+   - In the search box, search for and select these policies:
+     - `AmazonEC2FullAccess`
+     - `AmazonDynamoDBFullAccess`
+     - `IAMFullAccess`
+     - `AWSCloudFormationFullAccess`
+   - Click "Next: Tags" (adding tags is optional)
+   - Click "Next: Review"
+   - Review the user details and permissions, then click "Create user"
+
+5. **Save Access Credentials**:
+   - You'll see a success message with the access key ID and secret access key
+   - **IMPORTANT**: Click the "Download .csv" button to save these credentials
+   - This is the ONLY time you can view or download the secret access key
+   - Store these credentials securely - you'll need them for the GitHub secrets
+
+### Creating an EC2 Key Pair
+
+1. **Navigate to EC2 Service**:
+   - In the AWS Management Console search bar, type "EC2" and select it
+   - Or find EC2 under "Compute" section
+
+2. **Access Key Pairs Section**:
+   - In the EC2 dashboard, look for "Key Pairs" in the left sidebar
+   - It's under "Network & Security" category
+   - Click on "Key Pairs"
+
+3. **Create a New Key Pair**:
+   - Click the "Create key pair" button
+   - Enter a name (e.g., `solar-system-keypair`)
+   - For Key pair type: select "RSA"
+   - For Private key file format: select ".pem" (for OpenSSH)
+   - Click "Create key pair"
+
+4. **Secure the Key File**:
+   - The .pem file will automatically download to your computer
+   - Move it to a secure location on your machine
+   - Open a terminal and navigate to the directory with your key
+   - Run this command to set correct permissions:
+   ```bash
+   chmod 400 solar-system-keypair.pem
+   ```
+   - This ensures only your user can read the file, which is required for SSH
+
+5. **Verify Key Pair Creation**:
+   - You should now see your new key pair listed in the EC2 Key Pairs page
+   - Note the name exactly as it appears - you'll need to enter this in GitHub secrets
+
+### Setting Up GitHub Secrets
+
+After creating both the IAM user and EC2 key pair, you need to add them as secrets in GitHub:
+
+1. **AWS Credentials Secrets**:
+   - `AWS_ACCESS_KEY_ID`: Copy from the IAM user credentials CSV
+   - `AWS_SECRET_ACCESS_KEY`: Copy from the IAM user credentials CSV
+   - `AWS_REGION`: Enter your AWS region (e.g., `us-east-1`)
+   - `EC2_KEY_NAME`: The exact name of the key pair you created (e.g., `solar-system-keypair`)
+
+2. **EC2 SSH Secret**:
+   - `EC2_USERNAME`: Enter `ec2-user` (for Amazon Linux)
+   - `EC2_SSH_KEY`: Open the .pem file in a text editor and copy ALL contents, including the BEGIN and END lines

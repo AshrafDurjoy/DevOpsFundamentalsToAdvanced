@@ -494,7 +494,7 @@ jobs:
     if: |
       contains(github.ref, 'workflow') ||
       github.event.inputs.demo-mode == 'true' || 
-      (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request')
+      (github.event.inputs.setup-dynamodb != false && github event_name != 'pull_request')
     
     steps:
       - name: Configure AWS credentials
@@ -609,6 +609,19 @@ jobs:
           echo "Event type: ${{ github.event_name }}"
           echo "Environment: ${{ github.event.inputs.environment || 'development' }}"
       
+      - name: Verify IAM Instance Profile exists
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
+          INSTANCE_PROFILE_NAME="SolarSystemInstanceProfile-${ENVIRONMENT}"
+          
+          echo "Checking if instance profile exists: $INSTANCE_PROFILE_NAME"
+          if ! aws iam get-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME &>/dev/null; then
+            echo "❌ ERROR: IAM Instance Profile $INSTANCE_PROFILE_NAME does not exist."
+            echo "Please ensure the setup-ec2-role job ran successfully first."
+            exit 1
+          fi
+          echo "✅ Found IAM Instance Profile: $INSTANCE_PROFILE_NAME"
+      
       - name: Create or update EC2 instance
         id: create-ec2
         run: |
@@ -686,6 +699,19 @@ jobs:
               Value: !GetAtt SolarSystemInstance.PublicIp
           EOF
           
+          echo "Template validation..."
+          aws cloudformation validate-template --template-body file://ec2-template.yml || {
+            echo "❌ Template validation failed!";
+            cat ec2-template.yml;
+            exit 1;
+          }
+          
+          # Check for required secrets
+          if [[ -z "${{ secrets.EC2_KEY_NAME }}" ]]; then
+            echo "❌ ERROR: EC2_KEY_NAME secret is not set or empty"
+            exit 1
+          fi
+          
           # Check if stack already exists
           if aws cloudformation describe-stacks --stack-name $STACK_NAME 2>&1 | grep -q "Stack with id $STACK_NAME does not exist"; then
             echo "Creating new CloudFormation stack: $STACK_NAME"
@@ -695,7 +721,12 @@ jobs:
               --capabilities CAPABILITY_NAMED_IAM
               
             # Wait for stack creation to complete
-            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME
+            echo "Waiting for stack creation to complete..."
+            aws cloudformation wait stack-create-complete --stack-name $STACK_NAME || {
+              echo "❌ Stack creation failed! Checking stack events for errors...";
+              aws cloudformation describe-stack-events --stack-name $STACK_NAME --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`].[LogicalResourceId,ResourceStatusReason]' --output text;
+              exit 1;
+            }
           else
             echo "Updating existing CloudFormation stack: $STACK_NAME"
             aws cloudformation update-stack \

@@ -51,4 +51,16 @@ else
     echo "   Make sure to create this key pair in the AWS console."
 fi
 
+# Check if IAM instance profile exists
+echo "🔍 Testing IAM instance profile..."
+ENVIRONMENT="${1:-development}"
+PROFILE_NAME="SolarSystemInstanceProfile-${ENVIRONMENT}"
+
+if aws iam get-instance-profile --instance-profile-name $PROFILE_NAME &> /dev/null; then
+  echo "✅ Instance profile $PROFILE_NAME exists!"
+else
+  echo "⚠️ Instance profile $PROFILE_NAME not found!"
+  echo "You may need to run the setup-ec2-role job first."
+fi
+
 echo "✅ AWS credentials test complete!"
