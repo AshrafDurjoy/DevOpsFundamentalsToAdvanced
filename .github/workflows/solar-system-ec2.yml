@@ -90,6 +90,12 @@ jobs:
             getItem: (params, callback) => {
               console.log('Mock DynamoDB getItem called with:', JSON.stringify(params));
               const id = params.Key.id.N;
+              
+              // Special case for ID 999 which should return null/not found
+              if (id === '999') {
+                return callback ? callback(null, {}) : { promise: () => Promise.resolve({}) };
+              }
+              
               const mockItem = {
                 id: { N: id },
                 name: { S: `Planet-${id}` },
@@ -118,16 +124,21 @@ jobs:
           module.exports = mockDynamoDB;
           EOF
           
-          # Create test-setup.js with the proper export that app-test.js expects
+          # Create a more comprehensive test-setup.js that handles the app-test.js requirements
           cat > test-setup.js << 'EOF'
           console.log('Loading DynamoDB mock');
           const mockDynamoDB = require('./dynamodb-mock');
+          const sinon = require('sinon');
 
           // Export the configuration function that app-test.js is looking for
           module.exports = {
             configureDynamoDBForTesting: () => {
               console.log('Configuring DynamoDB for testing');
-              // The mock is already set up when this module is loaded
+              
+              // Add spy for additional debugging
+              sinon.spy(mockDynamoDB, 'scan');
+              sinon.spy(mockDynamoDB, 'getItem');
+              
               return mockDynamoDB;
             }
           };
@@ -153,7 +164,7 @@ jobs:
           cat > run-tests.sh << 'EOF'
           #!/bin/bash
           # Use the original test command from package.json but add our require and use npx
-          NODE_ENV=test npx mocha --require ./test-setup.js app-test.js --timeout 10000 --reporter mocha-junit-reporter --exit
+          NODE_OPTIONS="--unhandled-rejections=strict" NODE_ENV=test npx mocha --require ./test-setup.js app-test.js --timeout 10000 --reporter mocha-junit-reporter --exit
           EOF
           chmod +x run-tests.sh
           
