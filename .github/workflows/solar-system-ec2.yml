@@ -118,9 +118,20 @@ jobs:
           module.exports = mockDynamoDB;
           EOF
           
-          # Make the mock available to the test environment
-          echo "console.log('Loading DynamoDB mock');" >> test-setup.js
-          echo "require('./dynamodb-mock');" >> test-setup.js
+          # Create test-setup.js with the proper export that app-test.js expects
+          cat > test-setup.js << 'EOF'
+          console.log('Loading DynamoDB mock');
+          const mockDynamoDB = require('./dynamodb-mock');
+
+          // Export the configuration function that app-test.js is looking for
+          module.exports = {
+            configureDynamoDBForTesting: () => {
+              console.log('Configuring DynamoDB for testing');
+              // The mock is already set up when this module is loaded
+              return mockDynamoDB;
+            }
+          };
+          EOF
       
       - name: Configure environment for tests
         run: |
@@ -141,11 +152,12 @@ jobs:
           # Create a direct test command that uses our mock setup
           cat > run-tests.sh << 'EOF'
           #!/bin/bash
+          # Use the original test command from package.json but add our require
           NODE_ENV=test mocha --require ./test-setup.js app-test.js --timeout 10000 --reporter mocha-junit-reporter --exit
           EOF
           chmod +x run-tests.sh
           
-          # Verify current package.json
+          # Output for debugging
           echo "Current package.json content:"
           cat package.json
           
@@ -157,7 +169,14 @@ jobs:
         run: ./run-tests.sh
         
       - name: Generate code coverage
-        run: npm run coverage || echo "Coverage generation skipped"
+        run: |
+          # Create a coverage script that uses our mock setup
+          cat > run-coverage.sh << 'EOF'
+          #!/bin/bash
+          NODE_ENV=test nyc --reporter=lcov --reporter=text-summary ./run-tests.sh
+          EOF
+          chmod +x run-coverage.sh
+          ./run-coverage.sh || echo "Coverage generation skipped"
       
       - name: Upload test results
         uses: actions/upload-artifact@v4
