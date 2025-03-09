@@ -52,9 +52,25 @@ env:
   IMAGE_NAME: solar-system
 
 jobs:
+  # Debug job to see variables 
+  debug:
+    name: Debug Workflow Environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Display workflow context
+        run: |
+          echo "🐛 DEBUG INFORMATION:"
+          echo "Branch: ${{ github.ref }}"
+          echo "Event name: ${{ github.event_name }}"
+          echo "Workflow branch: workflow"
+          echo "Is workflow branch? ${{ contains(github.ref, 'workflow') }}"
+          echo "Demo mode: ${{ github.event.inputs.demo-mode }}"
+          echo "Setup DynamoDB: ${{ github.event.inputs.setup-dynamodb }}"
+
   # TESTING PHASE
   test:
     name: Test Application
+    needs: debug
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -354,10 +370,27 @@ jobs:
   setup-dynamodb:
     name: Setup DynamoDB
     runs-on: ubuntu-latest
-    # Run if demo-mode is true or if setup-dynamodb is true and not a pull request
-    if: ${{ github.event.inputs.demo-mode == 'true' || (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request') }}
+    needs: test
+    # Run if it's the workflow branch OR demo mode is true OR setup dynamodb and not a PR
+    if: |
+      contains(github.ref, 'workflow') ||
+      github.event.inputs.demo-mode == 'true' || 
+      (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request')
     
     steps:
+      - name: Show trigger reason
+        run: |
+          echo "🔍 DynamoDB setup running because:"
+          if [[ "${{ contains(github.ref, 'workflow') }}" == "true" ]]; then
+            echo "- Running on workflow branch"
+          fi
+          if [[ "${{ github.event.inputs.demo-mode }}" == "true" ]]; then
+            echo "- Demo mode is enabled"
+          fi
+          if [[ "${{ github.event.inputs.setup-dynamodb }}" != "false" && "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "- Setup DynamoDB is enabled and not a pull request"
+          fi
+      
       - name: Checkout code
         uses: actions/checkout@v4
       
@@ -443,8 +476,11 @@ jobs:
     name: Setup EC2 IAM Role
     needs: setup-dynamodb
     runs-on: ubuntu-latest
-    # Run if demo-mode is true or if setup-dynamodb is true and not a pull request
-    if: ${{ github.event.inputs.demo-mode == 'true' || (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request') }}
+    # Run if it's the workflow branch OR demo mode is true OR setup dynamodb and not a PR
+    if: |
+      contains(github.ref, 'workflow') ||
+      github.event.inputs.demo-mode == 'true' || 
+      (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request')
     
     steps:
       - name: Configure AWS credentials
@@ -531,8 +567,11 @@ jobs:
     name: Provision EC2 Instance
     needs: setup-ec2-role
     runs-on: ubuntu-latest
-    # Run if demo-mode is true or if setup-dynamodb is true and not a pull request
-    if: ${{ github.event.inputs.demo-mode == 'true' || (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request') }}
+    # Run if it's the workflow branch OR demo mode is true OR setup dynamodb and not a PR
+    if: |
+      contains(github.ref, 'workflow') ||
+      github.event.inputs.demo-mode == 'true' || 
+      (github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request')
     outputs:
       instance-id: ${{ steps.create-ec2.outputs.instance-id }}
       ec2-public-ip: ${{ steps.create-ec2.outputs.public-ip }}
@@ -685,8 +724,11 @@ jobs:
   deploy-to-ec2:
     name: Deploy to EC2 Instance
     needs: [build-docker, setup-dynamodb, setup-ec2-role, provision-ec2]
-    # Run if demo-mode is true or if not a pull request
-    if: ${{ github.event.inputs.demo-mode == 'true' || github.event_name != 'pull_request' }}
+    # Run if it's the workflow branch OR demo mode is true OR not a PR
+    if: |
+      contains(github.ref, 'workflow') ||
+      github.event.inputs.demo-mode == 'true' || 
+      github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event.inputs.environment || 'development' }}
