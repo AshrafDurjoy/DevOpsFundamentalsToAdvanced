@@ -1,0 +1,14 @@
+{
+  "name": "github-actions-demo",
+  "version": "1.0.0",
+  "description": "Demo project for GitHub Actions",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Tests passed! (This is a simulation)\" && exit 0",
+    "lint": "echo \"Linting passed! (This is a simulation)\" && exit 0",
+    "build": "mkdir -p dist && echo '<html><body><h1>Demo App</h1></body></html>' > dist/index.html"
+  },
+  "keywords": ["github", "actions", "demo"],
+  "author": "DevOps Engineer",
+  "license": "MIT"
+}

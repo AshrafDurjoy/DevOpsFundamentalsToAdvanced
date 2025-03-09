@@ -1,6 +1,6 @@
 name: 05 - Multiple Jobs Demo
 
-on: [push, workflow_dispatch]
+on: [workflow_dispatch]
 
 jobs:
     build_job:
@@ -10,7 +10,7 @@ jobs:
             - name: Install CowSay 
               run: sudo apt-get install cowsay -y
             - name: Execute CowSay
-              run: cowsay -f dragon "Run for cover, I'm a dragon!" >> dragon.txt
+              run: cowsay -f dragon "Run for cover, I'm a dragon!" > dragon.txt
             # Output file contents for clarity
             - name: Show generated file
               run: cat dragon.txt
@@ -24,6 +24,7 @@ jobs:
         needs: build_job
         runs-on: ubuntu-latest
         steps:
+            # Create our own test file since artifacts aren't being used in this basic example
             - name: Create test file
               run: echo "This is a test file" > test-file.txt
             - name: Test file exists
@@ -33,6 +34,7 @@ jobs:
     lint_job:
         name: Lint Job
         runs-on: ubuntu-latest
+        # Independent job - intentionally has no "needs" dependency
         steps:
             - name: Run linting simulation
               run: |
@@ -44,9 +46,15 @@ jobs:
         needs: [test_job, lint_job]  # This job needs both test and lint to complete
         runs-on: ubuntu-latest
         steps:
+            # Simulate deployment without needing artifacts from previous steps
             - name: Deploy
               run: |
                 echo "Deploying application..."
+                echo "Creating simulated deployment..."
+                mkdir -p deploy
+                echo "App version: 1.0.0" > deploy/version.txt
+                echo "Deployment timestamp: $(date)" >> deploy/version.txt
+                cat deploy/version.txt
                 echo "Deployment successful!"
             - name: Send notification
               run: echo "Deployment notification sent!"

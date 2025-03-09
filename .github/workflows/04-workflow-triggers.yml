@@ -1,0 +1,44 @@
+name: 04 - Workflow Triggers Demo
+
+# Multiple triggers demonstration
+on:
+  # Manual trigger with inputs
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'Message to display'
+        default: 'Hello from manual trigger!'
+        required: true
+  
+  # Push event trigger with path and branch filtering
+  push:
+    branches: [ main, dev* ]
+    paths:
+      - '**.md'
+      - '**.html'
+  
+  # Pull request event trigger
+  pull_request:
+    types: [opened, synchronize]
+    branches: [ main ]
+  
+  # Schedule trigger (commented to avoid unnecessary runs)
+  # schedule:
+  #   - cron: '0 12 * * 1-5'  # Monday to Friday at 12:00 UTC
+
+jobs:
+  show-trigger-info:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show trigger details
+        run: |
+          echo "Workflow triggered by: ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Manual message: ${{ github.event.inputs.message }}"
+          elif [ "${{ github.event_name }}" == "push" ]; then
+            echo "Branch: ${{ github.ref_name }}"
+            echo "Commit message: ${{ github.event.head_commit.message }}"
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "PR title: ${{ github.event.pull_request.title }}"
+            echo "PR action: ${{ github.event.action }}"
+          fi

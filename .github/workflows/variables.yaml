@@ -1,9 +1,10 @@
-name: Variables Scopes Demo
+name: 07a - Variables Scopes Demo
 # Workflow level variables
 env:
   WORKFLOW_VAR: "This is set at workflow level"
   SHARED_VAR: "This comes from workflow"
-on: [push]
+
+on: [push, workflow_dispatch]
 
 jobs:
   # Step Level Demo
@@ -31,6 +32,15 @@ jobs:
           echo "Shared variable: $SHARED_VAR"
           echo "Workflow variable: $WORKFLOW_VAR"
           echo "========================"
+      
+      - name: Using GITHUB_ENV to set variables
+        run: |
+          echo "DYNAMIC_VAR=This was set dynamically" >> $GITHUB_ENV
+          echo "Setting a variable for next steps"
+      
+      - name: Access dynamically set variable
+        run: |
+          echo "Dynamic variable: $DYNAMIC_VAR"
 
   # Job Level Demo
   job_level_demo:

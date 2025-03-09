@@ -1,0 +1,66 @@
+name: Scheduled Tasks Demo
+
+on:
+  schedule:
+    # Run at 8 AM UTC every Monday, Wednesday, and Friday
+    - cron: '0 8 * * 1,3,5'
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - backup
+          - cleanup
+          - report
+
+jobs:
+  backup:
+    name: Database Backup
+    runs-on: ubuntu-latest
+    if: github.event.inputs.task == 'backup' || github.event.inputs.task == 'all' || github.event_name == 'schedule'
+    steps:
+      - name: Simulate database backup
+        run: |
+          echo "Starting database backup..."
+          sleep 5
+          echo "Database backup completed at $(date)"
+          echo "Backup saved to simulated-backup-$(date +%Y%m%d).sql"
+
+  cleanup:
+    name: Cleanup Old Data
+    runs-on: ubuntu-latest
+    if: github.event.inputs.task == 'cleanup' || github.event.inputs.task == 'all' || github.event_name == 'schedule'
+    steps:
+      - name: Run cleanup process
+        run: |
+          echo "Starting cleanup process..."
+          echo "Finding files older than 30 days..."
+          sleep 3
+          echo "Removed 25 old temporary files"
+          echo "Cleanup completed at $(date)"
+
+  report:
+    name: Generate Reports
+    runs-on: ubuntu-latest
+    if: github.event.inputs.task == 'report' || github.event.inputs.task == 'all' || github.event_name == 'schedule'
+    needs: [backup, cleanup]
+    steps:
+      - name: Generate weekly report
+        run: |
+          echo "Generating system report..."
+          echo "Report Content:" > weekly-report.txt
+          echo "- Backup status: Success" >> weekly-report.txt
+          echo "- Cleanup status: Success" >> weekly-report.txt
+          echo "- Current system time: $(date)" >> weekly-report.txt
+          cat weekly-report.txt
+      
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-report
+          path: weekly-report.txt
+          retention-days: 7

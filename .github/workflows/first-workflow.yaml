@@ -1,9 +1,9 @@
-name: First Workflow
-on: [push]
+name: 03 - First Workflow Setup
+on: [push, workflow_dispatch]
 
 jobs:
   first_job:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest # Changed from self-hosted for classroom demo
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -14,8 +14,11 @@ jobs:
           ls -ltra
 
       - name: Generate ASCII Artwork
-        run: cowsay -f dragon "Run for cover, I'm a dragon!" >> dragon.txt
+        run: |
+          # Install cowsay if not available
+          which cowsay || sudo apt-get install -y cowsay
+          cowsay -f dragon "Run for cover, I'm a dragon!" >> dragon.txt
 
       - name: List files
         run: ls -al
-      
+

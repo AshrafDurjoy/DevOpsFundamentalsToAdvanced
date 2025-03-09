@@ -1,0 +1,95 @@
+name: Multi-Environment Deployment Demo
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+jobs:
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build app
+        run: |
+          echo "Building application..."
+          echo "Build completed at $(date)" > build-info.txt
+          
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build
+          path: build-info.txt
+
+  deploy-dev:
+    name: Deploy to Development
+    needs: build
+    if: github.event.inputs.environment == 'development' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: https://dev.example.com
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          
+      - name: Deploy to development
+        run: |
+          echo "Deploying to DEVELOPMENT environment..."
+          cat build-info.txt
+          echo "App URL: https://dev.example.com"
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: deploy-dev
+    if: github.event.inputs.environment == 'staging' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.example.com
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to STAGING environment..."
+          cat build-info.txt
+          echo "App URL: https://staging.example.com"
+
+  deploy-production:
+    name: Deploy to Production
+    needs: deploy-staging
+    if: github.event.inputs.environment == 'production' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://www.example.com
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          
+      - name: Deploy to production
+        run: |
+          echo "Deploying to PRODUCTION environment..."
+          cat build-info.txt
+          echo "App URL: https://www.example.com"
+          echo "Deployment completed successfully!"

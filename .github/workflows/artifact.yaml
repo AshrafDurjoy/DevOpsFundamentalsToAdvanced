@@ -1,6 +1,6 @@
-name: Artifact Job
+name: 10a - Artifacts Demo
 
-on: [push]
+on: [push, workflow_dispatch]
 
 jobs:
     build_job_1:

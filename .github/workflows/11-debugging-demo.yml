@@ -1,0 +1,42 @@
+name: 11 - Debugging Demo
+
+on: [workflow_dispatch]
+
+# Enable debug logging at workflow level
+env:
+  ACTIONS_RUNNER_DEBUG: true
+  ACTIONS_STEP_DEBUG: true
+
+jobs:
+  debug-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Basic debugging - Echo environment
+        run: env | sort
+      
+      - name: Debug GitHub context
+        run: echo "${{ toJson(github) }}"
+      
+      - name: Debug runner context
+        run: echo "${{ toJson(runner) }}"
+      
+      - name: Trace commands with set -x
+        run: |
+          set -x  # Enable command tracing
+          echo "This command will be printed before execution"
+          ls -la
+          pwd
+          set +x  # Disable command tracing
+      
+      - name: Simulate a failing command with error handling
+        run: |
+          echo "About to run a command that might fail..."
+          non_existent_command || echo "Command failed, but workflow continues"
+        continue-on-error: true
+      
+      - name: Use GitHub step debugging output
+        run: |
+          echo "::debug::This is a debug message visible when debugging is enabled"
+          echo "::warning::This is a warning message"
+          echo "::error::This is an error message, but it won't fail the workflow"
+          echo "::notice::This is a notice message"

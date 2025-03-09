@@ -1,0 +1,46 @@
+name: 06 - Built-in & Custom Actions Demo
+
+on: [workflow_dispatch]
+
+jobs:
+  built-in-actions:
+    name: Using Built-in Actions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Use GitHub Script action
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const time = new Date().toTimeString();
+            core.setOutput('time', time);
+            console.log(`Current time: ${time}`);
+      
+      # This step will show how to use outputs from previous steps
+      - name: Show output from GitHub Script
+        run: echo "Time from GitHub Script action was ${{ steps.2.outputs.time }}"
+
+  # We'll simulate a custom action by creating a composite action inline
+  # In a real scenario, you would create a separate repo or .github/actions directory
+  custom-action-simulation:
+    name: Custom Action Simulation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Simulate a custom action with a shell script
+        run: |
+          # Create a shell script that simulates a custom action
+          echo '#!/bin/bash' > custom-action.sh
+          echo 'echo "Hello from custom action!"' >> custom-action.sh
+          echo 'echo "Input parameter: $1"' >> custom-action.sh
+          chmod +x custom-action.sh
+      
+      # Execute our simulated custom action
+      - name: Execute custom action
+        run: ./custom-action.sh "Custom parameter"

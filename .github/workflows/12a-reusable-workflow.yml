@@ -1,0 +1,50 @@
+name: 12a - Reusable Workflow Definition
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: "Deployment environment"
+      version:
+        required: false
+        type: string
+        default: "latest"
+        description: "Version to deploy"
+    secrets:
+      deploy-token:
+        required: true
+        description: "Deployment authentication token"
+
+jobs:
+  reusable-deploy-job:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Deploy to environment
+        run: |
+          echo "🚀 Deploying version ${{ inputs.version }} to ${{ inputs.environment }}"
+          echo "Using deployment token for authentication (value hidden)"
+          echo "Deployment token exists: ${{ secrets.deploy-token != '' }}"
+          
+          # Simulate different deployment actions based on environment
+          case "${{ inputs.environment }}" in
+            "development")
+              echo "🔧 Running development deployment script..."
+              ;;
+            "staging")
+              echo "🧪 Running staging deployment script with additional testing..."
+              ;;
+            "production")
+              echo "🚨 Running production deployment with final verification..."
+              ;;
+            *)
+              echo "❓ Unknown environment: ${{ inputs.environment }}"
+              ;;
+          esac
+          
+          echo "✅ Deployment to ${{ inputs.environment }} completed successfully!"

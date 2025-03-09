@@ -1,0 +1,16 @@
+name: 01 - Hello GitHub Actions
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  hello-world:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Say Hello
+        run: echo "Hello, GitHub Actions!"
+      
+      - name: Show execution time
+        run: echo "Current time is $(date)"
