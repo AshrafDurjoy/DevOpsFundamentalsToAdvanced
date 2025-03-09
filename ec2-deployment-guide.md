@@ -1,14 +1,14 @@
 # AWS EC2 & DynamoDB Deployment Guide for Beginners
 
-This guide explains how to deploy the Solar System application to AWS EC2 with DynamoDB, designed specifically for DevOps beginners.
+This guide explains how to deploy the Solar System application to AWS EC2 with DynamoDB using a fully automated CI/CD pipeline.
 
 ## What You'll Learn
 
 - Setting up a complete CI/CD pipeline with GitHub Actions
-- Deploying a Node.js application to AWS EC2
+- Automated provisioning of AWS infrastructure including EC2 and DynamoDB
 - Using DynamoDB for serverless database storage
 - Working with IAM roles for secure access between AWS services
-- Managing Docker containers on EC2
+- Managing Docker containers on EC2 through automation
 
 ## Prerequisites
 
@@ -16,46 +16,21 @@ Before you begin, you'll need:
 
 1. **An AWS Account**: Sign up at [aws.amazon.com](https://aws.amazon.com) if you don't have one
 2. **GitHub Account**: For storing your code and using GitHub Actions
-3. **Basic Understanding**: Familiarity with Git, GitHub, and terminal commands
+3. **IAM User with Permissions**: Create an IAM user with permissions for EC2, CloudFormation, DynamoDB, and IAM
 
-## Step 1: Launch an EC2 Instance
+## Step 1: Set Up AWS Access
 
-1. **Log in to AWS Console**:
-   - Go to [aws.amazon.com](https://aws.amazon.com) and sign in
-   - Navigate to EC2 service
+1. **Create an IAM User**:
+   - Go to the AWS IAM console
+   - Create a new user with programmatic access
+   - Attach policies: AmazonEC2FullAccess, AmazonDynamoDBFullAccess, IAMFullAccess, AWSCloudFormationFullAccess
+   - Save the Access Key ID and Secret Access Key
 
-2. **Launch a New Instance**:
-   - Click "Launch Instance"
-   - Give it a name (e.g., "solar-system-dev")
-   - Select Amazon Linux 2023 AMI (or Ubuntu if preferred)
-   - Choose t2.micro instance type (free tier eligible)
-
-3. **Configure Security Group**:
-   - Create a new security group
-   - Allow SSH (port 22) from your IP address
-   - Allow HTTP (port 80) and custom TCP on port 3000 from anywhere
-   - Name it "solar-system-sg"
-
-4. **Create Key Pair**:
-   - Create a new key pair (or use existing)
+2. **Create an EC2 Key Pair**:
+   - Go to EC2 console -> Key Pairs
+   - Create a new key pair named "solar-system-keypair"
    - Download the .pem file and keep it secure
-   - Change permissions: `chmod 400 your-key.pem`
-
-5. **Launch and Connect**:
-   - Launch the instance
-   - Connect via SSH: `ssh -i your-key.pem ec2-user@your-instance-ip`
-
-6. **Install Docker**:
-   - For Amazon Linux 2023:
-   ```bash
-   sudo yum update -y
-   sudo yum install docker -y
-   sudo systemctl start docker
-   sudo systemctl enable docker
-   sudo usermod -aG docker ec2-user
-   ```
-   - Log out and log back in for group changes to take effect
-   - Test with: `docker --version`
+   - Change permissions: `chmod 400 solar-system-keypair.pem`
 
 ## Step 2: Create Required GitHub Secrets
 
@@ -68,33 +43,37 @@ In your GitHub repository:
    - `AWS_ACCESS_KEY_ID`: Your AWS access key
    - `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
    - `AWS_REGION`: Your AWS region (e.g., us-east-1)
+   - `EC2_KEY_NAME`: Name of your EC2 key pair (e.g., "solar-system-keypair")
 
-   **EC2 Connection**:
-   - `DEV_EC2_HOST`: Public IP or DNS of your development EC2 instance
-   - `PROD_EC2_HOST`: Public IP or DNS of your production EC2 instance
+   **SSH Key**:
    - `EC2_USERNAME`: Username for SSH (use "ec2-user" for Amazon Linux)
-   - `EC2_SSH_KEY`: The entire contents of your private key file (your-key.pem)
+   - `EC2_SSH_KEY`: The entire contents of your private key file (solar-system-keypair.pem)
 
 ## Step 3: Understanding the Workflow
 
-Our GitHub Actions workflow handles the complete deployment process:
+Our GitHub Actions workflow handles the complete deployment process with no manual steps:
 
 ### Testing Phase
 - Checks out the code and runs tests
 - Generates code coverage reports
 
+### Infrastructure Provisioning
+- Creates EC2 instance using CloudFormation
+- Sets up security groups and networking
+- Installs and configures Docker on the instance
+
 ### Docker Image Building
 - Creates a Docker image with the application
 - Pushes to GitHub Container Registry
 
-### DynamoDB Setup (Fully Automated!)
+### DynamoDB Setup (Fully Automated)
 - Creates DynamoDB table for planet data
 - Populates the table with solar system information
 - Sets up proper IAM roles and permissions
 
 ### EC2 Deployment
-- Connects to your EC2 instance
-- Runs Docker container with the application
+- Connects to the provisioned EC2 instance
+- Pulls and runs Docker container with the application
 - Configures environment variables to connect to DynamoDB
 
 ## Step 4: Running the Workflow
@@ -127,7 +106,7 @@ The workflow creates and configures:
    - No need for database credentials in the application
    - Uses AWS best practices for security
 
-3. **IAM Instance Profile**: Attaches the role to your EC2 instance
+3. **IAM Instance Profile**: Automatically attached to your EC2 instance
 
 The application connects to DynamoDB using the AWS SDK, which automatically:
 - Detects the IAM role attached to the EC2 instance
@@ -137,43 +116,46 @@ The application connects to DynamoDB using the AWS SDK, which automatically:
 ## Step 6: Verifying Your Deployment
 
 1. **Check Application**:
-   - Open a browser and go to `http://your-ec2-ip:3000`
+   - Open a browser and go to the URL provided in the workflow output
    - You should see the Solar System application
    - Try searching for planets by ID (1-9)
 
-2. **Check DynamoDB**:
-   - In AWS Console, go to DynamoDB
-   - Find the `solar-system-planets-development` table
-   - Verify the data is there (should see 9 items)
-
-3. **Check Container**:
-   - SSH into your EC2 instance
-   - Run `docker ps` to see the running container
-   - Check logs with `docker logs solar-system`
+2. **Check AWS Resources**:
+   - EC2: Verify instance is running in the AWS Console
+   - DynamoDB: Check that table exists with data
+   - CloudFormation: Review the created stack
 
 ## Troubleshooting Common Issues
 
-### Application Can't Connect to DynamoDB
-- **Check IAM Role**: Verify the role is created and attached
-- **Check Table Name**: Environment variable should match the DynamoDB table name
-- **Check Region**: AWS_REGION environment variable should match table region
+### CloudFormation Issues
+- **Stack Creation Failure**: Check the CloudFormation events in AWS Console
+- **Resource Limits**: Ensure your AWS account has enough quota for EC2 instances
 
-### Docker Issues
-- **Container Not Starting**: `docker logs solar-system` for error details
-- **Image Not Found**: Check if image was pushed to registry correctly
-- **Permission Issues**: Ensure EC2 user is in docker group
+### Application Issues
+- **Container Not Starting**: Check GitHub Actions logs for deployment step
+- **DynamoDB Connection**: Verify IAM role permissions are correctly set
 
 ### GitHub Actions Issues
 - **Workflow Failures**: Check detailed logs in GitHub Actions tab
 - **SSH Connection Issues**: Verify EC2_SSH_KEY is correct and has right format
-- **AWS Permissions**: Ensure AWS credentials have enough permissions
 
 ## Understanding the Architecture
 
 ```
 ┌─────────────────┐         ┌───────────────┐         ┌─────────────────┐
 │                 │         │               │         │                 │
-│  GitHub Actions │ ──────► │  EC2 Instance │ ──────► │    DynamoDB     │
+│  GitHub Actions │───1────►│ CloudFormation │───2────►│  EC2 + Docker  │
 │                 │         │               │         │                 │
-└─────────────────┘         └───────────────┘         └─────────────────┘
-       CI/CD                  Application Host           Database Storage
+└─────────────────┘         └───────────────┘         └────────┬────────┘
+        │                                                      │
+        │                                                      │
+        │                   ┌─────────────────┐               3
+        └────────4─────────►│    DynamoDB     │◄──────────────┘
+                            │                 │
+                            └─────────────────┘
+
+1: Initiates infrastructure creation
+2: Provisions and configures EC2 instance
+3: Application queries data from DynamoDB
+4: Creates and populates DynamoDB tables
+```

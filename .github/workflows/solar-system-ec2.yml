@@ -61,364 +61,532 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      - name: Run tests
-        run: npm test
-        
-      - name: Generate code coverage
-        run: npm run coverage
+      - name: Install sinon for testing
+        run: npm install --save sinon
       
+      - name: Configure environment for tests
+        run: |
+          # Set up testing environment variables
+          echo "DYNAMODB_TABLE=solar-system-planets-test" >> $GITHUB_ENV
+          echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
+          echo "NODE_ENV=test" >> $GITHUB_ENV
+          
+      - name: Run tests AWS config for tests
+        run: npm test.aws
+          echo "[default]" > ~/.aws/credentials
+      - name: Generate code coverageck-key" >> ~/.aws/credentials
+        run: npm run coverage || echo "Coverage generation skipped"ntials
+          echo "aws_region=us-east-1" >> ~/.aws/credentials
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        with:
+        with:npm test -- --coverage
           name: test-results
           path: solar-system-main/test-results.xml
-          retention-days: 5
-  
-  # DOCKER IMAGE BUILDING PHASE
-  build-docker:
+          retention-days: 5ge || echo "Coverage generation skipped"
+      
+  # DOCKER IMAGE BUILDING PHASEts
+  build-docker:ctions/upload-artifact@v4
     name: Build Docker Image
     needs: test # This job runs only after tests pass
-    runs-on: ubuntu-latest
-    outputs:
+    runs-on: ubuntu-latestem-main/test-results.xml
+    outputs:tention-days: 5
       image-tag: ${{ steps.set-image-tag.outputs.image-tag }}
-    
-    steps:
+      - name: Upload coverage report
+    steps:es: actions/upload-artifact@v4
       - name: Checkout code
         uses: actions/checkout@v4
-      
+          path: solar-system-main/coverage
       - name: Get version from package.json
         id: package-version
-        run: |
+        run: |GE BUILDING PHASE
           VERSION=$(node -e "console.log(require('./solar-system-main/package.json').version || '1.0.0')")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-      
+      eds: test # This job runs only after tests pass
       - name: Set image tag
         id: set-image-tag
-        run: |
+        run: |g: ${{ steps.set-image-tag.outputs.image-tag }}
           # Using timestamp and short SHA for unique image tags
           IMAGE_TAG="${{ steps.package-version.outputs.version }}-$(date +%s)-${GITHUB_SHA::7}"
           echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "Will tag image as: $IMAGE_TAG"
       
-      - name: Set up Docker Buildx
+      - name: Set up Docker Buildxkage.json
         uses: docker/setup-buildx-action@v3
-      
-      - name: Login to GitHub Container Registry
-        if: github.event_name != 'pull_request'
+        run: |
+      - name: Login to GitHub Container Registry('./solar-system-main/package.json').version || '1.0.0')")
+        if: github.event_name != 'pull_request'TPUT
         uses: docker/login-action@v3
-        with:
+        with: Set image tag
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+          password: ${{ secrets.GITHUB_TOKEN }}nique image tags
+          IMAGE_TAG="${{ steps.package-version.outputs.version }}-$(date +%s)-${GITHUB_SHA::7}"
+      - name: Build and push Docker image$GITHUB_OUTPUT
+        uses: docker/build-push-action@v5_TAG"
         with:
           context: ./solar-system-main
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.set-image-tag.outputs.image-tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
+          cache-from: type=ghaContainer Registry
+          cache-to: type=gha,mode=maxl_request'
+        uses: docker/login-action@v3
       - name: Image details
         if: github.event_name != 'pull_request'
-        run: |
+        run: |name: ${{ github.actor }}
           echo "✅ Docker image built and pushed to GitHub Container Registry"
           echo "📦 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.set-image-tag.outputs.image-tag }}"
-  
-  # AWS RESOURCE SETUP PHASE
+      - name: Build and push Docker image
+  # AWS RESOURCE SETUP PHASEush-action@v5
   setup-dynamodb:
-    name: Setup DynamoDB
-    runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request' }}
-    
-    steps:
+    name: Setup DynamoDBar-system-main
+    runs-on: ubuntu-latest.event_name != 'pull_request' }}
+    if: ${{ github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request' }}ag }}
+          cache-from: type=gha
+    steps:cache-to: type=gha,mode=max
       - name: Checkout code
         uses: actions/checkout@v4
-      
+        if: github.event_name != 'pull_request'
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
+        uses: aws-actions/configure-aws-credentials@v4Hub Container Registry"
+        with:o "📦 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.set-image-tag.outputs.image-tag }}"
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-      
+      me: Setup DynamoDB
       - name: Create DynamoDB table
-        run: |
+        run: |thub.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request' }}
           ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
           TABLE_NAME="solar-system-planets-${ENVIRONMENT}"
-          
+          me: Checkout code
           echo "Creating DynamoDB table: $TABLE_NAME"
           
-          # Check if table exists
+          # Check if table existsntials
           if aws dynamodb describe-table --table-name $TABLE_NAME >/dev/null 2>&1; then
             echo "Table $TABLE_NAME already exists"
-          else
-            echo "Creating table $TABLE_NAME..."
-            aws dynamodb create-table \
+          elseaccess-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            echo "Creating table $TABLE_NAME..."_SECRET_ACCESS_KEY }}
+            aws dynamodb create-table \EGION }}
               --table-name $TABLE_NAME \
               --attribute-definitions AttributeName=id,AttributeType=N \
               --key-schema AttributeName=id,KeyType=HASH \
               --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
-            
+            BLE_NAME="solar-system-planets-${ENVIRONMENT}"
             echo "Waiting for table to become active..."
             aws dynamodb wait table-exists --table-name $TABLE_NAME
           fi
-      
-      - name: Populate DynamoDB table with planets data
-        run: |
+          # Check if table exists
+      - name: Populate DynamoDB table with planets dataTABLE_NAME >/dev/null 2>&1; then
+        run: |ho "Table $TABLE_NAME already exists"
           ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
           TABLE_NAME="solar-system-planets-${ENVIRONMENT}"
-          
+            aws dynamodb create-table \
           echo "Populating DynamoDB table with planet data"
-          
-          # Mercury
-          aws dynamodb put-item \
+              --attribute-definitions AttributeName=id,AttributeType=N \
+          # Mercury-schema AttributeName=id,KeyType=HASH \
+          aws dynamodb put-item \ghput ReadCapacityUnits=5,WriteCapacityUnits=5
             --table-name $TABLE_NAME \
             --item '{"id": {"N": "1"}, "name": {"S": "Mercury"}, "description": {"S": "Mercury is the smallest and innermost planet in the Solar System. It is named after the Roman deity Mercury, the messenger of the gods."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Mercury_in_color_-_Prockter07-edit1.jpg/1024px-Mercury_in_color_-_Prockter07-edit1.jpg"}, "velocity": {"S": "47.87 km/s"}, "distance": {"S": "57.91 million km"}}'
-          
+            aws dynamodb wait table-exists --table-name $TABLE_NAME
           # Venus
           aws dynamodb put-item \
-            --table-name $TABLE_NAME \
+            --table-name $TABLE_NAME \with planets data
             --item '{"id": {"N": "2"}, "name": {"S": "Venus"}, "description": {"S": "Venus is the second planet from the Sun. It is named after the Roman goddess of love and beauty."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Venus-real_color.jpg/1024px-Venus-real_color.jpg"}, "velocity": {"S": "35.02 km/s"}, "distance": {"S": "108.2 million km"}}'
-          
-          # Earth
+          ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
+          # EarthAME="solar-system-planets-${ENVIRONMENT}"
           aws dynamodb put-item \
-            --table-name $TABLE_NAME \
+            --table-name $TABLE_NAME \ble with planet data"
             --item '{"id": {"N": "3"}, "name": {"S": "Earth"}, "description": {"S": "Earth is the third planet from the Sun and the only astronomical object known to harbor life."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/The_Blue_Marble_%28remastered%29.jpg/1024px-The_Blue_Marble_%28remastered%29.jpg"}, "velocity": {"S": "29.78 km/s"}, "distance": {"S": "149.6 million km"}}'
-          
-          # Mars
-          aws dynamodb put-item \
-            --table-name $TABLE_NAME \
+          # Mercury
+          # Marsnamodb put-item \
+          aws dynamodb put-item \AME \
+            --table-name $TABLE_NAME \ "name": {"S": "Mercury"}, "description": {"S": "Mercury is the smallest and innermost planet in the Solar System. It is named after the Roman deity Mercury, the messenger of the gods."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Mercury_in_color_-_Prockter07-edit1.jpg/1024px-Mercury_in_color_-_Prockter07-edit1.jpg"}, "velocity": {"S": "47.87 km/s"}, "distance": {"S": "57.91 million km"}}'
             --item '{"id": {"N": "4"}, "name": {"S": "Mars"}, "description": {"S": "Mars is the fourth planet from the Sun and the second-smallest planet in the Solar System. It is often referred to as the \"Red Planet\"."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/OSIRIS_Mars_true_color.jpg/1024px-OSIRIS_Mars_true_color.jpg"}, "velocity": {"S": "24.13 km/s"}, "distance": {"S": "227.9 million km"}}'
-          
-          # Jupiter
-          aws dynamodb put-item \
-            --table-name $TABLE_NAME \
+          # Venus
+          # Jupiterodb put-item \
+          aws dynamodb put-item \AME \
+            --table-name $TABLE_NAME \ "name": {"S": "Venus"}, "description": {"S": "Venus is the second planet from the Sun. It is named after the Roman goddess of love and beauty."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Venus-real_color.jpg/1024px-Venus-real_color.jpg"}, "velocity": {"S": "35.02 km/s"}, "distance": {"S": "108.2 million km"}}'
             --item '{"id": {"N": "5"}, "name": {"S": "Jupiter"}, "description": {"S": "Jupiter is the fifth planet from the Sun and the largest planet in the Solar System. It is a gas giant with a mass 2.5 times that of all the other planets combined."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Jupiter%2C_image_taken_by_NASA%27s_Hubble_Space_Telescope%2C_June_2019_-_Edited.jpg/1024px-Jupiter%2C_image_taken_by_NASA%27s_Hubble_Space_Telescope%2C_June_2019_-_Edited.jpg"}, "velocity": {"S": "13.07 km/s"}, "distance": {"S": "778.5 million km"}}'
-          
-          # Saturn
-          aws dynamodb put-item \
-            --table-name $TABLE_NAME \
+          # Earth
+          # Saturnmodb put-item \
+          aws dynamodb put-item \AME \
+            --table-name $TABLE_NAME \ "name": {"S": "Earth"}, "description": {"S": "Earth is the third planet from the Sun and the only astronomical object known to harbor life."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/The_Blue_Marble_%28remastered%29.jpg/1024px-The_Blue_Marble_%28remastered%29.jpg"}, "velocity": {"S": "29.78 km/s"}, "distance": {"S": "149.6 million km"}}'
             --item '{"id": {"N": "6"}, "name": {"S": "Saturn"}, "description": {"S": "Saturn is the sixth planet from the Sun and the second-largest in the Solar System, after Jupiter. It is a gas giant with an average radius about nine times that of Earth."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Saturn_during_Equinox.jpg/1024px-Saturn_during_Equinox.jpg"}, "velocity": {"S": "9.69 km/s"}, "distance": {"S": "1.434 billion km"}}'
-          
-          # Uranus
-          aws dynamodb put-item \
-            --table-name $TABLE_NAME \
+          # Mars
+          # Uranusmodb put-item \
+          aws dynamodb put-item \AME \
+            --table-name $TABLE_NAME \ "name": {"S": "Mars"}, "description": {"S": "Mars is the fourth planet from the Sun and the second-smallest planet in the Solar System. It is often referred to as the \"Red Planet\"."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/OSIRIS_Mars_true_color.jpg/1024px-OSIRIS_Mars_true_color.jpg"}, "velocity": {"S": "24.13 km/s"}, "distance": {"S": "227.9 million km"}}'
             --item '{"id": {"N": "7"}, "name": {"S": "Uranus"}, "description": {"S": "Uranus is the seventh planet from the Sun. It has the third-largest planetary radius and fourth-largest planetary mass in the Solar System."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Uranus2.jpg/1024px-Uranus2.jpg"}, "velocity": {"S": "6.81 km/s"}, "distance": {"S": "2.871 billion km"}}'
-          
-          # Neptune
-          aws dynamodb put-item \
-            --table-name $TABLE_NAME \
+          # Jupiter
+          # Neptuneodb put-item \
+          aws dynamodb put-item \AME \
+            --table-name $TABLE_NAME \ "name": {"S": "Jupiter"}, "description": {"S": "Jupiter is the fifth planet from the Sun and the largest planet in the Solar System. It is a gas giant with a mass 2.5 times that of all the other planets combined."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Jupiter%2C_image_taken_by_NASA%27s_Hubble_Space_Telescope%2C_June_2019_-_Edited.jpg/1024px-Jupiter%2C_image_taken_by_NASA%27s_Hubble_Space_Telescope%2C_June_2019_-_Edited.jpg"}, "velocity": {"S": "13.07 km/s"}, "distance": {"S": "778.5 million km"}}'
             --item '{"id": {"N": "8"}, "name": {"S": "Neptune"}, "description": {"S": "Neptune is the eighth and farthest known Solar planet from the Sun. It is the fourth-largest planet by diameter, the third-most-massive planet, and the densest giant planet."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Neptune_-_Voyager_2_%2829347980845%29_flatten_crop.jpg/1024px-Neptune_-_Voyager_2_%2829347980845%29_flatten_crop.jpg"}, "velocity": {"S": "5.43 km/s"}, "distance": {"S": "4.495 billion km"}}'
-          
-          # Sun
-          aws dynamodb put-item \
-            --table-name $TABLE_NAME \
+          # Saturn
+          # Sunynamodb put-item \
+          aws dynamodb put-item \AME \
+            --table-name $TABLE_NAME \ "name": {"S": "Saturn"}, "description": {"S": "Saturn is the sixth planet from the Sun and the second-largest in the Solar System, after Jupiter. It is a gas giant with an average radius about nine times that of Earth."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Saturn_during_Equinox.jpg/1024px-Saturn_during_Equinox.jpg"}, "velocity": {"S": "9.69 km/s"}, "distance": {"S": "1.434 billion km"}}'
             --item '{"id": {"N": "9"}, "name": {"S": "Sun"}, "description": {"S": "The Sun is the star at the center of the Solar System. It is a nearly perfect sphere of hot plasma, heated to incandescence by nuclear fusion reactions in its core."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg/1024px-The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg"}, "velocity": {"S": "220 km/s"}, "distance": {"S": "0 km (center of the solar system)"}}'
-          
+          # Uranus
           echo "DynamoDB table populated with planet data"
-  
-  # EC2 IAM ROLE SETUP
+            --table-name $TABLE_NAME \
+  # EC2 IAM ROLE SETUPid": {"N": "7"}, "name": {"S": "Uranus"}, "description": {"S": "Uranus is the seventh planet from the Sun. It has the third-largest planetary radius and fourth-largest planetary mass in the Solar System."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Uranus2.jpg/1024px-Uranus2.jpg"}, "velocity": {"S": "6.81 km/s"}, "distance": {"S": "2.871 billion km"}}'
   setup-ec2-role:
     name: Setup EC2 IAM Role
-    needs: setup-dynamodb
-    runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request' }}
-    
-    steps:
+    needs: setup-dynamodbt-item \
+    runs-on: ubuntu-latestTABLE_NAME \
+    if: ${{ github.event.inputs.setup-dynamodb != false && github.event_name != 'pull_request' }} the eighth and farthest known Solar planet from the Sun. It is the fourth-largest planet by diameter, the third-most-massive planet, and the densest giant planet."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Neptune_-_Voyager_2_%2829347980845%29_flatten_crop.jpg/1024px-Neptune_-_Voyager_2_%2829347980845%29_flatten_crop.jpg"}, "velocity": {"S": "5.43 km/s"}, "distance": {"S": "4.495 billion km"}}'
+          
+    steps:# Sun
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
-        with:
+        with:-item '{"id": {"N": "9"}, "name": {"S": "Sun"}, "description": {"S": "The Sun is the star at the center of the Solar System. It is a nearly perfect sphere of hot plasma, heated to incandescence by nuclear fusion reactions in its core."}, "image": {"S": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg/1024px-The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg"}, "velocity": {"S": "220 km/s"}, "distance": {"S": "0 km (center of the solar system)"}}'
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-      
+      2 IAM ROLE SETUP
       - name: Create IAM role for EC2
-        run: |
+        run: |p EC2 IAM Role
           ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
           ROLE_NAME="SolarSystemEC2Role-${ENVIRONMENT}"
-          POLICY_NAME="SolarSystemDynamoDBAccess-${ENVIRONMENT}"
+          POLICY_NAME="SolarSystemDynamoDBAccess-${ENVIRONMENT}"b.event_name != 'pull_request' }}
           INSTANCE_PROFILE_NAME="SolarSystemInstanceProfile-${ENVIRONMENT}"
           
-          # Check if role exists
+          # Check if role existsentials
           if aws iam get-role --role-name $ROLE_NAME >/dev/null 2>&1; then
             echo "Role $ROLE_NAME already exists"
-          else
-            echo "Creating IAM role $ROLE_NAME..."
-            
+          elseaccess-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            echo "Creating IAM role $ROLE_NAME..."ECRET_ACCESS_KEY }}
+            s-region: ${{ secrets.AWS_REGION }}
             # Create role trust policy document
             cat > trust-policy.json << 'EOF'
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
+          {: |
+            "Version": "2012-10-17",ent.inputs.environment || 'development' }}"
+            "Statement": [SystemEC2Role-${ENVIRONMENT}"
+              {Y_NAME="SolarSystemDynamoDBAccess-${ENVIRONMENT}"
+                "Effect": "Allow",olarSystemInstanceProfile-${ENVIRONMENT}"
                 "Principal": {
                   "Service": "ec2.amazonaws.com"
-                },
-                "Action": "sts:AssumeRole"
+                },am get-role --role-name $ROLE_NAME >/dev/null 2>&1; then
+                "Action": "sts:AssumeRole"exists"
               }
-            ]
-          }
-          EOF
-            
+            ]cho "Creating IAM role $ROLE_NAME..."
+          } 
+          EOF Create role trust policy document
+            cat > trust-policy.json << 'EOF'
             # Create role
             aws iam create-role --role-name $ROLE_NAME --assume-role-policy-document file://trust-policy.json
-            
+            "Statement": [
             echo "Creating IAM policy $POLICY_NAME..."
             # Create policy document for DynamoDB access
             cat > policy.json << EOF
-          {
+          {       "Service": "ec2.amazonaws.com"
             "Version": "2012-10-17",
-            "Statement": [
+            "Statement": ["sts:AssumeRole"
               {
                 "Effect": "Allow",
                 "Action": [
                   "dynamodb:GetItem",
                   "dynamodb:BatchGetItem",
                   "dynamodb:Query",
-                  "dynamodb:Scan"
+                  "dynamodb:Scan"-role-name $ROLE_NAME --assume-role-policy-document file://trust-policy.json
                 ],
-                "Resource": [
+                "Resource": [M policy $POLICY_NAME..."
                   "arn:aws:dynamodb:*:*:table/solar-system-planets-${ENVIRONMENT}"
-                ]
+                ] policy.json << EOF
               }
-            ]
-          }
-          EOF
-            
+            ]Version": "2012-10-17",
+          } "Statement": [
+          EOF {
+                "Effect": "Allow",
             # Create policy
             POLICY_ARN=$(aws iam create-policy --policy-name $POLICY_NAME --policy-document file://policy.json --query 'Policy.Arn' --output text)
-            
+                  "dynamodb:BatchGetItem",
             # Attach policy to role
             aws iam attach-role-policy --role-name $ROLE_NAME --policy-arn $POLICY_ARN
-            
+                ],
             # Attach AmazonSSMManagedInstanceCore for SSM access (optional but useful)
             aws iam attach-role-policy --role-name $ROLE_NAME --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-          fi
-          
+          fi    ]
+              }
           # Check if instance profile exists
           if aws iam get-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME >/dev/null 2>&1; then
             echo "Instance profile $INSTANCE_PROFILE_NAME already exists"
           else
             echo "Creating instance profile $INSTANCE_PROFILE_NAME..."
-            # Create instance profile
+            # Create instance profilete-policy --policy-name $POLICY_NAME --policy-document file://policy.json --query 'Policy.Arn' --output text)
             aws iam create-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME
-            
-            # Add role to instance profile
+            # Attach policy to role
+            # Add role to instance profileole-name $ROLE_NAME --policy-arn $POLICY_ARN
             aws iam add-role-to-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME --role-name $ROLE_NAME
-          fi
-          
+          fi# Attach AmazonSSMManagedInstanceCore for SSM access (optional but useful)
+            aws iam attach-role-policy --role-name $ROLE_NAME --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
           echo "IAM role and instance profile setup complete"
           echo "Instance profile ARN: $(aws iam get-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME --query 'InstanceProfile.Arn' --output text)"
-          
-          # Store the instance profile name for later use
+          # Check if instance profile exists
+          # Store the instance profile name for later useile-name $INSTANCE_PROFILE_NAME >/dev/null 2>&1; then
           echo "instance-profile-name=$INSTANCE_PROFILE_NAME" >> $GITHUB_OUTPUT
-
-  # EC2 DEPLOYMENT PHASE
-  deploy-to-ec2:
-    name: Deploy to EC2
-    needs: [build-docker, setup-dynamodb]
-    if: |
-      github.event_name != 'pull_request' && 
+          else
+  # EC2 DEPLOYMENT PHASEONINGng instance profile $INSTANCE_PROFILE_NAME..."
+  deploy-to-ec2:eate instance profile
+    name: Deploy to EC2 Instanceate-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME
+    needs: [build-docker, setup-dynamodb, setup-ec2-role, provision-ec2]
+    if: |{{ github.event_name != 'pull_request' && (github.event.inputs.setup-dynamodb != false) }}   # Add role to instance profile
+      github.event_name != 'pull_request' && ANCE_PROFILE_NAME --role-name $ROLE_NAME
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
-    environment:
-      name: ${{ github.event.inputs.environment || 'development' }}
+    runs-on: ubuntu-latestteps.create-ec2.outputs.public-ip }}
+    environment: instance profile setup complete"
+      name: ${{ github.event.inputs.environment || 'development' }}'InstanceProfile.Arn' --output text)"
       url: ${{ steps.deploy-details.outputs.app-url }}
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
+        uses: actions/checkout@v4      # Store the instance profile name for later use
+    steps: "instance-profile-name=$INSTANCE_PROFILE_NAME" >> $GITHUB_OUTPUT
+      - name: Checkout code credentials
+        uses: actions/checkout@v4re-aws-credentials@v4
+        with:oy-to-ec2:
+      - name: Configure AWS credentialss.AWS_ACCESS_KEY_ID }}
+        uses: aws-actions/configure-aws-credentials@v4T_ACCESS_KEY }}
+        with:-region: ${{ secrets.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-      
-      - name: Set environment variables
-        id: env-vars
-        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"vironment:
+      - name: Set environment variablesent || 'development' }}
+        id: env-vars${{ secrets.EC2_KEY_NAME }}".deploy-details.outputs.app-url }}
+        run: |ANCE_NAME="solar-system-${ENVIRONMENT}"
           ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"
+          cat > ec2-template.yml << EOFme: Checkout code
+          # Use the newly provisioned EC2 instance
+          EC2_HOST=${{ needs.provision-ec2.outputs.ec2-public-ip }}olar System EC2 instance'
           
           # Different configurations based on environment
           if [ "$ENVIRONMENT" == "production" ]; then
-            echo "ec2-host=${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT
-            echo "dynamodb-table=solar-system-planets-production" >> $GITHUB_OUTPUT
-            echo "app-url=http://${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT
+            echo "ec2-host=$EC2_HOST" >> $GITHUB_OUTPUTProperties:access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            echo "dynamodb-table=solar-system-planets-production" >> $GITHUB_OUTPUTtion
+            echo "app-url=http://$EC2_HOST:3000" >> $GITHUB_OUTPUT
           else
-            echo "ec2-host=${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT
-            echo "dynamodb-table=solar-system-planets-development" >> $GITHUB_OUTPUT
-            echo "app-url=http://${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT
-          fi
+            echo "ec2-host=$EC2_HOST" >> $GITHUB_OUTPUT        FromPort: 22: Set environment variables
+            echo "dynamodb-table=solar-system-planets-development" >> $GITHUB_OUTPUT              ToPort: 22  id: env-vars
+            echo "app-url=http://$EC2_HOST:3000" >> $GITHUB_OUTPUT
+          fi    - IpProtocol: tcpRONMENT="${{ github.event.inputs.environment || 'development' }}"
       
-      - name: Generate application deployment script
-        run: |
-          # Create a deployment script that will run on the EC2 instance
-          cat > deploy.sh << 'EOL'
-          #!/bin/bash
-          
-          # Log all commands for debugging
-          set -x
-          
+      - name: Generate application deployment scriptased on environment
+        run: |idrIp: 0.0.0.0/0RONMENT" == "production" ]; then
+          # Create a deployment script that will run on the EC2 instance        - IpProtocol: tcp  echo "ec2-host=${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT
+          cat > deploy.sh << 'EOL'ets-production" >> $GITHUB_OUTPUT
+          #!/bin/bash    ToPort: 3000 "app-url=http://${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT
+                    CidrIp: 0.0.0.0/0else
+          # Log all commands for debugging}" >> $GITHUB_OUTPUT
+          set -xsystem-planets-development" >> $GITHUB_OUTPUT
+                    Value: solar-system-sg-${ENVIRONMENT}  echo "app-url=http://${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT
           # Pull the new Docker image
           docker pull ${IMAGE_URL}
-          
-          # Stop and remove the existing container if it's running
+          yment script
+          # Stop and remove the existing container if it's running    Properties:n: |
           docker stop solar-system || true
-          docker rm solar-system || true
-          
+          docker rm solar-system || true}
+          {KEY_NAME}
           # Run the new container with environment variables
           docker run -d --name solar-system \
-            -p 3000:3000 \
-            -e AWS_REGION="${AWS_REGION}" \
-            -e DYNAMODB_TABLE="${DYNAMODB_TABLE}" \
+            -p 3000:3000 \ystemInstanceProfile-${ENVIRONMENT}
+            -e AWS_REGION="${AWS_REGION}" \:
+            -e DYNAMODB_TABLE="${DYNAMODB_TABLE}" \        Fn::Base64: !Sub |# Pull the new Docker image
             -e NODE_ENV="${ENVIRONMENT}" \
             ${IMAGE_URL}
-          
-          # Check if container started successfully
+          running
+          # Check if container started successfully      systemctl start dockerer stop solar-system || true
           if [ "$(docker ps -q -f name=solar-system)" ]; then
-            echo "Container started successfully!"
-          else
-            echo "Failed to start container"
-            exit 1
+            echo "Container started successfully!"  usermod -aG docker ec2-user
+          else    Tags:Run the new container with environment variables
+            echo "Failed to start container"     - Key: Nameker run -d --name solar-system \
+            exit 1          Value: ${INSTANCE_NAME}  -p 3000:3000 \
           fi
-          EOL
+          EOL    Outputs:      -e DYNAMODB_TABLE="${DYNAMODB_TABLE}" \
           
-          chmod +x deploy.sh
-      
+          chmod +x deploy.sh instance
+       Value: !Ref SolarSystemInstance
       - name: Copy deployment script to EC2
-        uses: appleboy/scp-action@master
-        with:
+        uses: appleboy/scp-action@master the EC2 instancestem)" ]; then
+        with:nstance.PublicIpssfully!"
           host: ${{ steps.env-vars.outputs.ec2-host }}
           username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ secrets.EC2_SSH_KEY }}- name: Create or update EC2 instance      exit 1
           source: "deploy.sh"
           target: "/home/${{ secrets.EC2_USERNAME }}"
-      
+      IRONMENT="${{ github.event.inputs.environment || 'development' }}"
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
-        with:
-          host: ${{ steps.env-vars.outputs.ec2-host }}
-          username: ${{ secrets.EC2_USERNAME }}
+        with:C2
+          host: ${{ steps.env-vars.outputs.ec2-host }}tion describe-stacks --stack-name $STACK_NAME > /dev/null 2>&1; thenaction@master
+          username: ${{ secrets.EC2_USERNAME }}"Updating existing CloudFormation stack: $STACK_NAME"
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
           envs: |
             IMAGE_URL=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-docker.outputs.image-tag }}
-            AWS_REGION=${{ secrets.AWS_REGION }}
-            DYNAMODB_TABLE=${{ steps.env-vars.outputs.dynamodb-table }}
-            ENVIRONMENT=${{ github.event.inputs.environment || 'development' }}
+            AWS_REGION=${{ secrets.AWS_REGION }}/${{ secrets.EC2_USERNAME }}"
+            DYNAMODB_TABLE=${{ steps.env-vars.outputs.dynamodb-table }}complete
+            ENVIRONMENT=${{ github.event.inputs.environment || 'development' }}-complete --stack-name $STACK_NAME
           script: |
-            # Run the deployment script
-            cd /home/${{ secrets.EC2_USERNAME }}
-            chmod +x deploy.sh
-            ./deploy.sh
-
+            # Run the deployment scripting new CloudFormation stack: $STACK_NAME"
+            cd /home/${{ secrets.EC2_USERNAME }}            aws cloudformation create-stack \          host: ${{ steps.env-vars.outputs.ec2-host }}
+            chmod +x deploy.shK_NAME \EC2_USERNAME }}
+            ./deploy.shody file://ec2-template.yml \.EC2_SSH_KEY }}
+--capabilities CAPABILITY_IAMpt_stop: true
       - name: Deployment details
         id: deploy-details
+        run: |      aws cloudformation wait stack-create-complete --stack-name $STACK_NAME      AWS_REGION=${{ secrets.AWS_REGION }}
+          echo "🚀 Deployed to EC2 instance!"uts.dynamodb-table }}
+          echo "app-url=${{ steps.env-vars.outputs.app-url }}" >> $GITHUB_OUTPUTNMENT=${{ github.event.inputs.environment || 'development' }}
+      om stack outputs
+      - name: Send notificationKey=='InstanceId'].OutputValue" --output text)
+        run: |-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='PublicIP'].OutputValue" --output text)
+          echo "📧 Deployment notification:"
+          echo "Solar System application has been deployed to ${{ github.event.inputs.environment || 'development' }}"reated/updated EC2 instance with ID: $INSTANCE_ID and Public IP: $PUBLIC_IP"loy.sh
+          echo "URL: ${{ steps.env-vars.outputs.app-url }}:3000"
+          echo "Deployment Date: $(date)"          echo "public-ip=$PUBLIC_IP" >> $GITHUB_OUTPUT      - name: Deployment details
+
+
+
+          echo "This deployment uses Amazon DynamoDB for storing planet data"          echo ""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+          echo "This deployment uses Amazon DynamoDB for storing planet data"          echo ""          echo "Deployment Date: $(date)"          echo "URL: ${{ steps.env-vars.outputs.app-url }}:3000"          echo "Solar System application has been deployed to ${{ github.event.inputs.environment || 'development' }}"          echo "📧 Deployment notification:"        run: |      - name: Send notification                echo "app-url=${{ steps.env-vars.outputs.app-url }}" >> $GITHUB_OUTPUT
+
+
+          echo "🚀 Deployed to EC2 instance!"        run: |        id: deploy-details      - name: Deployment details            ./deploy.sh            chmod +x deploy.sh            cd /home/${{ secrets.EC2_USERNAME }}            # Run the deployment script          script: |            ENVIRONMENT=${{ github.event.inputs.environment || 'development' }}            DYNAMODB_TABLE=${{ steps.env-vars.outputs.dynamodb-table }}            AWS_REGION=${{ secrets.AWS_REGION }}            IMAGE_URL=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-docker.outputs.image-tag }}          envs: |          script_stop: true          key: ${{ secrets.EC2_SSH_KEY }}          username: ${{ secrets.EC2_USERNAME }}          host: ${{ steps.env-vars.outputs.ec2-host }}        with:        uses: appleboy/ssh-action@master      - name: Deploy to EC2                target: "/home/${{ secrets.EC2_USERNAME }}"          source: "deploy.sh"          key: ${{ secrets.EC2_SSH_KEY }}          username: ${{ secrets.EC2_USERNAME }}          host: ${{ steps.env-vars.outputs.ec2-host }}        with:        uses: appleboy/scp-action@master      - name: Copy deployment script to EC2                chmod +x deploy.sh                    EOL          fi            exit 1            echo "Failed to start container"          else            echo "Container started successfully!"          if [ "$(docker ps -q -f name=solar-system)" ]; then          # Check if container started successfully                      ${IMAGE_URL}            -e NODE_ENV="${ENVIRONMENT}" \            -e DYNAMODB_TABLE="${DYNAMODB_TABLE}" \            -e AWS_REGION="${AWS_REGION}" \            -p 3000:3000 \          docker run -d --name solar-system \          # Run the new container with environment variables                    docker rm solar-system || true          docker stop solar-system || true          # Stop and remove the existing container if it's running                    docker pull ${IMAGE_URL}          # Pull the new Docker image                    set -x          # Log all commands for debugging                    #!/bin/bash          cat > deploy.sh << 'EOL'          # Create a deployment script that will run on the EC2 instance        run: |      - name: Generate application deployment script                fi            echo "app-url=http://${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT            echo "dynamodb-table=solar-system-planets-development" >> $GITHUB_OUTPUT            echo "ec2-host=${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT          else            echo "app-url=http://${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT            echo "dynamodb-table=solar-system-planets-production" >> $GITHUB_OUTPUT            echo "ec2-host=${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT          if [ "$ENVIRONMENT" == "production" ]; then          # Different configurations based on environment                    ENVIRONMENT="${{ github.event.inputs.environment || 'development' }}"        run: |        id: env-vars      - name: Set environment variables                aws-region: ${{ secrets.AWS_REGION }}          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}        with:        uses: aws-actions/configure-aws-credentials@v4      - name: Configure AWS credentials              uses: actions/checkout@v4      - name: Checkout code    steps:          url: ${{ steps.deploy-details.outputs.app-url }}      name: ${{ github.event.inputs.environment || 'development' }}    environment:    runs-on: ubuntu-latest      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')      github.event_name != 'pull_request' &&     if: |    needs: [build-docker, setup-dynamodb]    name: Deploy to EC2  deploy-to-ec2:  # EC2 DEPLOYMENT PHASE            echo "SSH is now available on the instance"                    fi            exit 1            echo "Timeout waiting for SSH to become available"          if [ $counter -ge $timeout ]; then                    done            echo "Still waiting for SSH... ($counter/$timeout seconds)"            counter=$((counter+5))            sleep 5          while ! nc -z $PUBLIC_IP 22 && [ $counter -lt $timeout ]; do          counter=0          timeout=300          echo "Waiting for SSH to become available..."          # Wait for SSH to be available                    fi            echo "DEV_EC2_HOST=$PUBLIC_IP" >> $GITHUB_ENV          else            echo "PROD_EC2_HOST=$PUBLIC_IP" >> $GITHUB_ENV          if [ "$ENVIRONMENT" == "production" ]; then          # Save EC2 details to GitHub environment                  id: deploy-details
         run: |
           echo "🚀 Deployed to EC2 instance!"
           echo "app-url=${{ steps.env-vars.outputs.app-url }}" >> $GITHUB_OUTPUT

@@ -1,87 +1,93 @@
-const path = require('path');
 const express = require('express');
-const OS = require('os');
 const bodyParser = require('body-parser');
-const mongoose = require("mongoose");
+const path = require('path');
+const AWS = require('aws-sdk');
+
 const app = express();
-const cors = require('cors')
 
+// Configure AWS SDK - this will use EC2 instance role when deployed
+AWS.config.update({ region: process.env.AWS_REGION || 'us-east-1' });
 
+// Create DynamoDB document client
+const dynamoDB = new AWS.DynamoDB();
+const tableName = process.env.DYNAMODB_TABLE || 'solar-system-planets-development';
+
+// Middleware setup
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, '/')));
-app.use(cors())
+app.use(express.static(path.join(__dirname, 'public')));
 
-mongoose.connect(process.env.MONGO_URI, {
-    user: process.env.MONGO_USERNAME,
-    pass: process.env.MONGO_PASSWORD,
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}, function(err) {
-    if (err) {
-        console.log("error!! " + err)
-    } else {
-      //  console.log("MongoDB Connection Successful")
+// Routes
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'index.html'));
+});
+
+// API to get all planets
+app.get('/api/planets', async (req, res) => {
+  try {
+    const params = {
+      TableName: tableName
+    };
+    
+    const data = await dynamoDB.scan(params).promise();
+    
+    if (!data.Items || data.Items.length === 0) {
+      return res.json([]);
     }
-})
-
-var Schema = mongoose.Schema;
-
-var dataSchema = new Schema({
-    name: String,
-    id: Number,
-    description: String,
-    image: String,
-    velocity: String,
-    distance: String
-});
-var planetModel = mongoose.model('planets', dataSchema);
-
-
-
-app.post('/planet',   function(req, res) {
-   // console.log("Received Planet ID " + req.body.id)
-    planetModel.findOne({
-        id: req.body.id
-    }, function(err, planetData) {
-        if (err) {
-            alert("Ooops, We only have 9 planets and a sun. Select a number from 0 - 9")
-            res.send("Error in Planet Data")
-        } else {
-            res.send(planetData);
-        }
-    })
-})
-
-app.get('/',   async (req, res) => {
-    res.sendFile(path.join(__dirname, '/', 'index.html'));
+    
+    const planets = data.Items.map(item => ({
+      id: parseInt(item.id.N),
+      name: item.name.S,
+      description: item.description.S,
+      image: item.image.S,
+      velocity: item.velocity.S,
+      distance: item.distance.S
+    }));
+    
+    res.json(planets);
+  } catch (error) {
+    console.error('Error fetching planets:', error);
+    res.status(500).json({ error: 'Failed to fetch planets', details: error.message });
+  }
 });
 
+// API to get a specific planet by ID
+app.get('/api/planets/:id', async (req, res) => {
+  try {
+    const params = {
+      TableName: tableName,
+      Key: {
+        id: { N: req.params.id }
+      }
+    };
+    
+    const data = await dynamoDB.getItem(params).promise();
+    
+    if (!data.Item) {
+      return res.status(404).json({ error: 'Planet not found' });
+    }
+    
+    const planet = {
+      id: parseInt(data.Item.id.N),
+      name: data.Item.name.S,
+      description: data.Item.description.S,
+      image: data.Item.image.S,
+      velocity: data.Item.velocity.S,
+      distance: data.Item.distance.S
+    };
+    
+    res.json(planet);
+  } catch (error) {
+    console.error('Error fetching planet:', error);
+    res.status(500).json({ error: 'Failed to fetch planet', details: error.message });
+  }
+});
 
-app.get('/os',   function(req, res) {
-    res.setHeader('Content-Type', 'application/json');
-    res.send({
-        "os": OS.hostname(),
-        "env": process.env.NODE_ENV
-    });
-})
+// Server setup
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
-app.get('/live',   function(req, res) {
-    res.setHeader('Content-Type', 'application/json');
-    res.send({
-        "status": "live"
-    });
-})
-
-app.get('/ready',   function(req, res) {
-    res.setHeader('Content-Type', 'application/json');
-    res.send({
-        "status": "ready"
-    });
-})
-
-app.listen(3000, () => {
-    console.log("Server successfully running on port - " +3000);
-})
-
-
+// For testing purposes
 module.exports = app;

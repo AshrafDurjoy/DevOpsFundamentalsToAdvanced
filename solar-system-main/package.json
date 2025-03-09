@@ -1,28 +1,32 @@
 {
-  "name": "Solar System",
+  "name": "solar-system",
   "version": "6.7.6",
+  "description": "Solar System App",
+  "main": "app.js",
   "author": "Siddharth Barahalikar <barahalikar.siddharth@gmail.com>",
   "homepage": "https://www.linkedin.com/in/barahalikar-siddharth/",
   "license": "MIT",
   "scripts": {
     "start": "node app.js",
-    "test": "mocha app-test.js --timeout 10000 --reporter mocha-junit-reporter --exit",
-    "coverage": "nyc --reporter cobertura --reporter lcov --reporter text --reporter json-summary  mocha app-test.js --timeout 10000  --exit"
+    "test": "NODE_ENV=test mocha app-test.js --timeout 10000 --reporter mocha-junit-reporter --exit",
+    "coverage": "NODE_ENV=test nyc --reporter=lcov --reporter=text-summary npm test"
   },
   "nyc": {
     "check-coverage": true,
     "lines": 90
   },
   "dependencies": {
+    "aws-sdk": "^2.1300.0",
+    "body-parser": "^1.19.0",
+    "chai": "^4.3.4",
+    "chai-http": "^4.3.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "mocha-junit-reporter": "^2.2.1",
-    "mongoose": "5.13.20",
-    "nyc": "^15.1.0"
+    "mocha": "^9.1.3",
+    "mocha-junit-reporter": "^2.0.2",
+    "sinon": "^15.2.0"
   },
   "devDependencies": {
-    "chai": "*",
-    "chai-http": "*",
-    "mocha": "*"
+    "nyc": "^15.1.0"
   }
 }

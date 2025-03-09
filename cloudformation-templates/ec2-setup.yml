@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for Solar System EC2 instance with Docker'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: development
+    AllowedValues:
+      - development
+      - production
+    Description: Environment (development or production)
+    
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    Description: EC2 instance type
+    
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of existing EC2 KeyPair
+
+Resources:
+  SolarSystemSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Security group for Solar System application
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+          Description: SSH access
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP access
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+          Description: Application port
+      Tags:
+        - Key: Name
+          Value: !Sub solar-system-sg-${EnvironmentName}
+        - Key: Environment
+          Value: !Ref EnvironmentName
+  
+  SolarSystemRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: !Sub SolarSystemDynamoDBAccess-${EnvironmentName}
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:BatchGetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub arn:aws:dynamodb:*:*:table/solar-system-planets-${EnvironmentName}
+      RoleName: !Sub SolarSystemEC2Role-${EnvironmentName}
+
+  SolarSystemInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub SolarSystemInstanceProfile-${EnvironmentName}
+      Roles:
+        - !Ref SolarSystemRole
+  
+  SolarSystemInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0261755bbcb8c4a84  # Amazon Linux 2023 AMI (adjust for your region)
+      InstanceType: !Ref InstanceType
+      SecurityGroups:
+        - !Ref SolarSystemSecurityGroup
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref SolarSystemInstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Update packages
+          yum update -y
+          
+          # Install Docker
+          yum install docker -y
+          systemctl start docker
+          systemctl enable docker
+          usermod -aG docker ec2-user
+          
+          # Install AWS CLI
+          yum install -y aws-cli
+          
+          # Create a status file to indicate setup completion
+          echo "EC2 setup completed at $(date)" > /home/ec2-user/setup-complete.txt
+          
+          # Set up application directory
+          mkdir -p /home/ec2-user/solar-system
+          chown ec2-user:ec2-user /home/ec2-user/solar-system
+      Tags:
+        - Key: Name
+          Value: !Sub solar-system-${EnvironmentName}
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+Outputs:
+  InstanceId:
+    Description: ID of the EC2 instance
+    Value: !Ref SolarSystemInstance
+  
+  PublicIP:
+    Description: Public IP address of the EC2 instance
+    Value: !GetAtt SolarSystemInstance.PublicIp
+  
+  PublicDNS:
+    Description: Public DNS of the EC2 instance
+    Value: !GetAtt SolarSystemInstance.PublicDnsName
+  
+  SecurityGroup:
+    Description: Security group of the EC2 instance
+    Value: !Ref SolarSystemSecurityGroup

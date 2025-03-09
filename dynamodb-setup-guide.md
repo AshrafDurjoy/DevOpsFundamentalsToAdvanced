@@ -1,6 +1,10 @@
 # DynamoDB Setup Guide for Solar System Application
 
-This guide explains how Amazon DynamoDB is set up for the Solar System application. DynamoDB is a fully managed NoSQL database service provided by AWS that provides fast and predictable performance with seamless scalability.
+This guide explains how Amazon DynamoDB is set up for the Solar System application. DynamoDB is a fully managed NoSQL database service provided by AWS that delivers fast and predictable performance with seamless scalability.
+
+## What is DynamoDB?
+
+Amazon DynamoDB is a key-value and document database that provides single-digit millisecond performance at any scale. It's a fully managed, multi-region, multi-active, durable database with built-in security, backup and restore, and in-memory caching.
 
 ## Automated Setup with GitHub Actions
 
@@ -68,6 +72,19 @@ The workflow automatically populates the DynamoDB table with data about planets 
 
 The workflow creates IAM roles and policies that allow the EC2 instance to access the DynamoDB table without needing to store credentials in the application.
 
+## Data Model
+
+The Solar System application uses a simple data model:
+
+| Attribute   | Type   | Description                           |
+|-------------|--------|---------------------------------------|
+| id          | Number | Primary key, unique identifier        |
+| name        | String | Name of the planet                    |
+| description | String | Description of the planet             |
+| image       | String | URL to an image of the planet         |
+| velocity    | String | Orbital velocity (formatted string)   |
+| distance    | String | Distance from the Sun (formatted string) |
+
 ## Viewing and Managing DynamoDB Data
 
 You can view and manage your DynamoDB tables using:
@@ -84,4 +101,3 @@ You can view and manage your DynamoDB tables using:
    
    # Get a specific planet by ID
    aws dynamodb get-item --table-name solar-system-planets-development --key '{"id": {"N": "3"}}'
-   
