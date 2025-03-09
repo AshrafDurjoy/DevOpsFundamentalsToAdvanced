@@ -160,6 +160,32 @@ jobs:
           echo "aws_secret_access_key=mock-secret" >> ~/.aws/credentials
           echo "aws_region=us-east-1" >> ~/.aws/credentials
       
+      - name: Create mock views directory and files
+        run: |
+          # Create views directory and a simple index.html for the home page test
+          mkdir -p views
+          echo '<html><body><h1>Solar System Test Page</h1></body></html>' > views/index.html
+          
+          # Create a public directory with any static assets needed
+          mkdir -p public
+          echo '/* Test CSS */' > public/style.css
+          
+          # Debug directory structure
+          echo "Current directory structure:"
+          ls -la
+          echo "Views directory:"
+          ls -la views
+          
+          # Also create an app-info.js to understand app path
+          cat > app-info.js << 'EOF'
+          const path = require('path');
+          console.log('App directory: ', __dirname);
+          console.log('Views directory: ', path.join(__dirname, 'views'));
+          console.log('Index.html path: ', path.join(__dirname, 'views', 'index.html'));
+          console.log('Path exists:', require('fs').existsSync(path.join(__dirname, 'views', 'index.html')));
+          EOF
+          node app-info.js
+      
       - name: Update test command to use mock
         run: |
           # Create a direct test command that uses our mock setup with detailed logging
