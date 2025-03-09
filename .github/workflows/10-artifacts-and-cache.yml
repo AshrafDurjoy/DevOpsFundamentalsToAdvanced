@@ -1,7 +1,7 @@
 name: 10 - Artifacts and Cache Demo
 
 
-on: [workflow_dispatch]
+on: [push]
 
 jobs:
   cache-demo:
