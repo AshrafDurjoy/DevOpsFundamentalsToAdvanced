@@ -75,16 +75,21 @@ jobs:
           cat > dynamodb-mock.js << 'EOF'
           const AWS = require('aws-sdk');
           
+          // Create mock planets database with correct planet names for testing
+          const mockPlanets = {
+            '1': { id: { N: '1' }, name: { S: 'Mercury' }, description: { S: 'Mock Mercury description' }, 
+                  image: { S: 'mock-image-url' }, velocity: { S: '47.87 km/s' }, distance: { S: '57.91 million km' } },
+            '2': { id: { N: '2' }, name: { S: 'Venus' }, description: { S: 'Mock Venus description' },
+                  image: { S: 'mock-image-url' }, velocity: { S: '35.02 km/s' }, distance: { S: '108.2 million km' } },
+            '3': { id: { N: '3' }, name: { S: 'Earth' }, description: { S: 'Mock Earth description' },
+                  image: { S: 'mock-image-url' }, velocity: { S: '29.78 km/s' }, distance: { S: '149.6 million km' } }
+          };
+
           // Create mock implementation for DynamoDB
           const mockDynamoDB = {
             scan: (params, callback) => {
               console.log('Mock DynamoDB scan called with:', JSON.stringify(params));
-              const mockItems = [
-                { id: { N: '1' }, name: { S: 'Mercury' }, description: { S: 'Mock planet description' }, 
-                  image: { S: 'mock-image-url' }, velocity: { S: '47.87 km/s' }, distance: { S: '57.91 million km' } },
-                { id: { N: '2' }, name: { S: 'Venus' }, description: { S: 'Mock planet description' },
-                  image: { S: 'mock-image-url' }, velocity: { S: '35.02 km/s' }, distance: { S: '108.2 million km' } }
-              ];
+              const mockItems = Object.values(mockPlanets);
               return callback ? callback(null, { Items: mockItems }) : { promise: () => Promise.resolve({ Items: mockItems }) };
             },
             getItem: (params, callback) => {
@@ -92,18 +97,13 @@ jobs:
               const id = params.Key.id.N;
               
               // Special case for ID 999 which should return null/not found
-              if (id === '999') {
+              if (id === '999' || !mockPlanets[id]) {
+                console.log(`Planet with ID ${id} not found`);
                 return callback ? callback(null, {}) : { promise: () => Promise.resolve({}) };
               }
               
-              const mockItem = {
-                id: { N: id },
-                name: { S: `Planet-${id}` },
-                description: { S: 'Mock planet description' },
-                image: { S: 'mock-image-url' },
-                velocity: { S: '30 km/s' },
-                distance: { S: '100 million km' }
-              };
+              const mockItem = mockPlanets[id];
+              console.log(`Returning mock planet: ${JSON.stringify(mockItem)}`);
               return callback ? callback(null, { Item: mockItem }) : { promise: () => Promise.resolve({ Item: mockItem }) };
             }
           };
@@ -111,12 +111,14 @@ jobs:
           // Override AWS.DynamoDB.DocumentClient with our mock
           const originalDocumentClient = AWS.DynamoDB.DocumentClient;
           AWS.DynamoDB.DocumentClient = function() {
+            console.log('Creating mock DynamoDB.DocumentClient');
             return mockDynamoDB;
           };
           
           // Also override the regular DynamoDB client
           const originalDynamoDB = AWS.DynamoDB;
           AWS.DynamoDB = function() {
+            console.log('Creating mock DynamoDB client');
             return mockDynamoDB;
           };
           
@@ -160,11 +162,14 @@ jobs:
       
       - name: Update test command to use mock
         run: |
-          # Create a direct test command that uses our mock setup with npx to run local packages
+          # Create a direct test command that uses our mock setup with detailed logging
           cat > run-tests.sh << 'EOF'
           #!/bin/bash
+          # Enable verbose output for better debugging
+          set -x
+          
           # Use the original test command from package.json but add our require and use npx
-          NODE_OPTIONS="--unhandled-rejections=strict" NODE_ENV=test npx mocha --require ./test-setup.js app-test.js --timeout 10000 --reporter mocha-junit-reporter --exit
+          NODE_OPTIONS="--unhandled-rejections=strict" NODE_ENV=test DEBUG=express:* npx mocha --require ./test-setup.js app-test.js --timeout 10000 --reporter mocha-junit-reporter --exit
           EOF
           chmod +x run-tests.sh
           
@@ -175,9 +180,49 @@ jobs:
           # Extract the current test script
           TEST_CMD=$(node -e "console.log(require('./package.json').scripts.test || '')")
           echo "Current test command: $TEST_CMD"
+          
+          # Create a file to examine the app's DynamoDB handling
+          cat > examine-test.js << 'EOF'
+          // Simple test script to see how the app handles DynamoDB responses
+          const AWS = require('aws-sdk');
+          const mockDynamoDB = require('./dynamodb-mock');
+          
+          // Configure AWS to use our mock
+          AWS.config.update({ region: 'us-east-1' });
+          
+          async function testDynamoDB() {
+            const dynamoDB = new AWS.DynamoDB();
+            try {
+              console.log("Testing scan...");
+              const scanResult = await dynamoDB.scan({ TableName: "test-table" }).promise();
+              console.log("Scan result:", JSON.stringify(scanResult, null, 2));
+              
+              console.log("Testing getItem for ID 1...");
+              const getResult = await dynamoDB.getItem({ 
+                TableName: "test-table", 
+                Key: { id: { N: "1" } }
+              }).promise();
+              console.log("GetItem result:", JSON.stringify(getResult, null, 2));
+              
+              console.log("Testing getItem for ID 999...");
+              const notFoundResult = await dynamoDB.getItem({ 
+                TableName: "test-table", 
+                Key: { id: { N: "999" } }
+              }).promise();
+              console.log("Not found result:", JSON.stringify(notFoundResult, null, 2));
+            } catch (error) {
+              console.error("Error:", error);
+            }
+          }
+          
+          testDynamoDB();
+          EOF
       
-      - name: Run tests
-        run: ./run-tests.sh
+      - name: Run mock tests
+        run: node examine-test.js
+      
+      - name: Run tests with debugging
+        run: ./run-tests.sh || { echo "Test failed with exit code $?"; cat test-results.xml || true; exit 1; }
         
       - name: Generate code coverage
         run: |
